@@ -56,21 +56,6 @@ type KiloSendTurnInput = ProviderSendTurnInput & {
   };
 };
 
-type KiloRuntimeRawSource =
-  | "kilo.server.event"
-  | "kilo.server.permission"
-  | "kilo.server.question";
-
-type KiloProviderRuntimeEvent = Omit<ProviderRuntimeEvent, "provider" | "raw"> & {
-  readonly provider: ProviderRuntimeEvent["provider"] | "kilo";
-  readonly raw?: {
-    readonly source: KiloRuntimeRawSource;
-    readonly method?: string;
-    readonly messageType?: string;
-    readonly payload: unknown;
-  };
-};
-
 type KiloProviderSession = Omit<ProviderSession, "provider"> & {
   readonly provider: ProviderSession["provider"] | "kilo";
 };
@@ -698,10 +683,6 @@ function toToolLifecycleEventType(
   return previous?.kind === "tool" ? "item.updated" : "item.started";
 }
 
-async function readJsonData<T>(promise: Promise<T>): Promise<T> {
-  return promise;
-}
-
 function readProviderListResponse(
   value:
     | ProviderListResponse
@@ -777,22 +758,20 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
 
     const resumedSessionId = readResumeSessionId(kiloInput.resumeCursor);
     const resumedSession = resumedSessionId
-      ? await readJsonData(
-          client.session.get({
+      ? await client.session
+          .get({
             sessionID: resumedSessionId,
             ...(workspace ? { workspace } : {}),
-          }),
-        ).catch(() => undefined)
+          })
+          .catch(() => undefined)
       : undefined;
 
     const createdSession =
       resumedSession ??
-      (await readJsonData(
-        client.session.create({
-          ...(workspace ? { workspace } : {}),
-          title: `T3 thread ${input.threadId}`,
-        }),
-      ));
+      (await client.session.create({
+        ...(workspace ? { workspace } : {}),
+        title: `T3 thread ${input.threadId}`,
+      }));
 
     const createdAt = nowIso();
     const providerSessionId = asString(asRecord(createdSession)?.id);
@@ -875,6 +854,9 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
   }
 
   async sendTurn(input: ProviderSendTurnInput): Promise<ProviderTurnStartResult> {
+    if (input.attachments && input.attachments.length > 0) {
+      throw new Error("Attachments are not supported by Kilo");
+    }
     const kiloInput = input as KiloSendTurnInput;
     const context = this.requireSession(input.threadId);
     const turnId = createTurnId();
@@ -924,23 +906,21 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
     });
 
     try {
-      await readJsonData(
-        context.client.session.promptAsync({
-          sessionID: context.providerSessionId,
-          ...(context.workspace ? { workspace: context.workspace } : {}),
-          ...(providerId && modelId
-            ? {
-                model: {
-                  providerID: providerId,
-                  modelID: modelId,
-                },
-              }
-            : {}),
-          ...(agent ? { agent } : {}),
-          ...(variant ? { variant } : {}),
-          parts: [textPart(kiloInput.input ?? "")],
-        }),
-      );
+      await context.client.session.promptAsync({
+        sessionID: context.providerSessionId,
+        ...(context.workspace ? { workspace: context.workspace } : {}),
+        ...(providerId && modelId
+          ? {
+              model: {
+                providerID: providerId,
+                modelID: modelId,
+              },
+            }
+          : {}),
+        ...(agent ? { agent } : {}),
+        ...(variant ? { variant } : {}),
+        parts: [textPart(kiloInput.input ?? "")],
+      });
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Kilo failed to start turn";
       context.activeTurnId = undefined;
@@ -999,12 +979,10 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
 
   async interruptTurn(threadId: ThreadId): Promise<void> {
     const context = this.requireSession(threadId);
-    await readJsonData(
-      context.client.session.abort({
-        sessionID: context.providerSessionId,
-        ...(context.workspace ? { workspace: context.workspace } : {}),
-      }),
-    );
+    await context.client.session.abort({
+      sessionID: context.providerSessionId,
+      ...(context.workspace ? { workspace: context.workspace } : {}),
+    });
     context.activeTurnId = undefined;
     context.session = {
       ...stripTransientSessionFields(context.session),
@@ -1019,13 +997,11 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
     decision: ProviderApprovalDecision,
   ): Promise<void> {
     const context = this.requireSession(threadId);
-    await readJsonData(
-      context.client.permission.reply({
-        requestID: requestId,
-        ...(context.workspace ? { workspace: context.workspace } : {}),
-        reply: toPermissionReply(decision),
-      }),
-    );
+    await context.client.permission.reply({
+      requestID: requestId,
+      ...(context.workspace ? { workspace: context.workspace } : {}),
+      reply: toPermissionReply(decision),
+    });
   }
 
   async respondToUserInput(
@@ -1055,23 +1031,19 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
       }
     }
 
-    await readJsonData(
-      context.client.question.reply({
-        requestID: requestId,
-        ...(context.workspace ? { workspace: context.workspace } : {}),
-        answers: orderedAnswers,
-      }),
-    );
+    await context.client.question.reply({
+      requestID: requestId,
+      ...(context.workspace ? { workspace: context.workspace } : {}),
+      answers: orderedAnswers,
+    });
   }
 
   async readThread(threadId: ThreadId): Promise<ProviderThreadSnapshot> {
     const context = this.requireSession(threadId);
-    const messages = await readJsonData(
-      context.client.session.messages({
-        sessionID: context.providerSessionId,
-        ...(context.workspace ? { workspace: context.workspace } : {}),
-      }),
-    );
+    const messages = await context.client.session.messages({
+      sessionID: context.providerSessionId,
+      ...(context.workspace ? { workspace: context.workspace } : {}),
+    });
 
     const turns = (Array.isArray(messages) ? messages : []).map((entry) => {
       const info = asRecord(asRecord(entry)?.info);
@@ -1110,7 +1082,7 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
         : {}),
     });
     const payload = readProviderListResponse(
-      await readJsonData(client.provider.list(options?.workspace ? { workspace: options.workspace } : {})),
+      await client.provider.list(options?.workspace ? { workspace: options.workspace } : {}),
     );
     // Show models from all configured providers, not just connected ones.
     // Connection status is a runtime concern — users want to pick from
@@ -1121,7 +1093,7 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
       return listed;
     }
     const configured = readConfigProvidersResponse(
-      await readJsonData(client.config.providers(options?.workspace ? { workspace: options.workspace } : {})),
+      await client.config.providers(options?.workspace ? { workspace: options.workspace } : {}),
     );
     return parseProviderModels(configured.providers);
   }
@@ -1200,18 +1172,6 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
       });
 
       const startedBaseUrl = await new Promise<string>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          try {
-            child.kill();
-          } catch {
-            // Process may already be dead.
-          }
-          reject(
-            new Error(
-              `Timed out waiting for Kilo server to start after ${SERVER_START_TIMEOUT_MS}ms`,
-            ),
-          );
-        }, SERVER_START_TIMEOUT_MS);
         let output = "";
 
         const onChunk = (chunk: Buffer) => {
@@ -1220,18 +1180,17 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
           if (!url) {
             return;
           }
-          clearTimeout(timeout);
+          cleanup();
           resolve(url);
         };
 
-        child.stdout.on("data", onChunk);
-        child.stderr.on("data", onChunk);
-        child.once("error", (error) => {
-          clearTimeout(timeout);
+        const onError = (error: Error) => {
+          cleanup();
           reject(error);
-        });
-        child.once("exit", (code) => {
-          clearTimeout(timeout);
+        };
+
+        const onExit = (code: number | null) => {
+          cleanup();
           void probeServer(baseUrl, authHeader).then((reuse) => {
             if (reuse) {
               resolve(baseUrl);
@@ -1246,7 +1205,34 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
               ),
             );
           });
-        });
+        };
+
+        const cleanup = () => {
+          clearTimeout(timeout);
+          child.stdout.off("data", onChunk);
+          child.stderr.off("data", onChunk);
+          child.off("error", onError);
+          child.off("exit", onExit);
+        };
+
+        const timeout = setTimeout(() => {
+          cleanup();
+          try {
+            child.kill();
+          } catch {
+            // Process may already be dead.
+          }
+          reject(
+            new Error(
+              `Timed out waiting for Kilo server to start after ${SERVER_START_TIMEOUT_MS}ms`,
+            ),
+          );
+        }, SERVER_START_TIMEOUT_MS);
+
+        child.stdout.on("data", onChunk);
+        child.stderr.on("data", onChunk);
+        child.once("error", onError);
+        child.once("exit", onExit);
       });
 
       const shared = {
@@ -1810,8 +1796,8 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
     });
   }
 
-  private emitRuntimeEvent(event: KiloProviderRuntimeEvent): void {
-    this.emit("event", event as unknown as ProviderRuntimeEvent);
+  private emitRuntimeEvent(event: ProviderRuntimeEvent): void {
+    this.emit("event", event);
   }
 }
 

@@ -5572,10 +5572,16 @@ function mergeDiscoveredModels(
       result[provider] = [...enriched, ...customOnly];
       continue;
     }
+    // Build a lookup of discovered models by slug so we can merge metadata
+    // (e.g. pricingTier) into base entries and also add truly-new models.
+    const discoveredBySlug = new Map(models.map((m) => [m.slug, m]));
+    const merged = (base[provider] ?? []).map((m) => {
+      const discovered = discoveredBySlug.get(m.slug);
+      return discovered ? { ...m, ...discovered } : m;
+    });
+    // Append any discovered models that weren't already in the base list.
     const additions = models.filter((m) => !existing.has(m.slug));
-    if (additions.length > 0) {
-      result[provider] = [...additions, ...(base[provider] ?? [])];
-    }
+    result[provider] = [...additions, ...merged];
   }
   return result;
 }
@@ -5606,7 +5612,12 @@ function groupModelsBySubProvider(
         groupMap.set(subProviderId, group);
         groupOrder.push(subProviderId);
       }
-      group.models.push({ slug: model.slug, name: modelName });
+      group.models.push({
+        slug: model.slug,
+        name: modelName,
+        ...(model.pricingTier != null && { pricingTier: model.pricingTier }),
+        ...(model.isCustom != null && { isCustom: model.isCustom }),
+      });
     } else {
       ungrouped.push(model);
     }

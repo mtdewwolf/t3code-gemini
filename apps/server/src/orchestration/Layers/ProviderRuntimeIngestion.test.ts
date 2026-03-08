@@ -457,6 +457,27 @@ describe("ProviderRuntimeIngestion", () => {
     const harness = await createHarness();
     const now = new Date().toISOString();
 
+    // Seed thread-2 so the auxiliary completion targets a real but different thread
+    harness.emit({
+      type: "turn.started",
+      eventId: asEventId("evt-turn-started-thread2-seed"),
+      provider: "codex",
+      createdAt: now,
+      threadId: asThreadId("thread-2"),
+      turnId: asTurnId("turn-thread2-seed"),
+    });
+
+    harness.emit({
+      type: "turn.completed",
+      eventId: asEventId("evt-turn-completed-thread2-seed"),
+      provider: "codex",
+      createdAt: now,
+      threadId: asThreadId("thread-2"),
+      turnId: asTurnId("turn-thread2-seed"),
+      status: "completed",
+    });
+
+    // Start primary turn on thread-1
     harness.emit({
       type: "turn.started",
       eventId: asEventId("evt-turn-started-primary"),
@@ -472,12 +493,13 @@ describe("ProviderRuntimeIngestion", () => {
         thread.session?.status === "running" && thread.session?.activeTurnId === "turn-primary",
     );
 
+    // Emit auxiliary turn.completed on thread-2 — should not affect thread-1
     harness.emit({
       type: "turn.completed",
       eventId: asEventId("evt-turn-completed-aux"),
       provider: "codex",
       createdAt: new Date().toISOString(),
-      threadId: asThreadId("thread-1"),
+      threadId: asThreadId("thread-2"),
       turnId: asTurnId("turn-aux"),
       status: "completed",
     });

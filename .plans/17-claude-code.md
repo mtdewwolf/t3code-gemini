@@ -122,6 +122,9 @@ Each provider manages its own authentication externally:
 1. **Environment variables and CLI auth** -- Credentials are resolved via provider-native mechanisms (e.g. `ANTHROPIC_API_KEY` for Claude, `OPENAI_API_KEY` for Codex, `gh auth` for Copilot). The adapter layer never stores or brokers credentials directly; it relies on the underlying CLI/SDK picking them up from the environment.
 2. **Per-provider rate limiting** -- Each server manager (`codexAppServerManager`, `claudeCodeServerManager`, etc.) is responsible for honoring its provider's rate limits. Adapters should surface rate-limit errors as `ProviderAdapterProcessError` so orchestration can report them cleanly.
 3. **Concurrent session limits** -- The number of simultaneous provider sessions is bounded by system resources (open processes, file descriptors, memory). `ProviderSessionDirectory` tracks active sessions but does not enforce hard caps; operators should monitor resource usage when running multiple providers concurrently.
+4. **Credential leakage prevention** -- Error messages, logs, and serialized `ProviderAdapterProcessError` payloads must never include raw API keys or tokens. Adapters should redact secrets before surfacing diagnostics.
+5. **Secure environment propagation** -- When spawning child processes (CLI binaries, SDK sub-processes), pass an explicit environment whitelist rather than forwarding the entire `process.env`. This limits accidental exposure of unrelated secrets to the child.
+6. **Secret rotation** -- Rotating a provider API key or token requires restarting all active sessions for that provider. Document this operational requirement; there is no hot-reload path for credentials.
 
 ### 2.2 Claude runtime bridge
 
@@ -341,6 +344,14 @@ Whichever option is chosen:
 2. checkpoint revert tests must pass under orchestration expectations
 3. user-visible activity log should explain failures clearly when provider rollback is impossible
 
+### Decision criteria
+
+Choose the rollback strategy as follows:
+
+1. If the Agent SDK exposes a native rewind/rollback API that can truncate conversation history to an arbitrary checkpoint, use **Option A** (provider-native rewind). This gives the cleanest UX and avoids session restart overhead.
+2. If no native rewind API exists or it cannot target the exact checkpoint boundary orchestration requires, use **Option B** (session restart + state truncation shim).
+3. **Time-box rule:** if investigation into Option A takes longer than 2 working days without a reliable prototype, default to Option B and move on. Option A can be revisited as a follow-up enhancement once the base integration is stable.
+
 ---
 
 ## Phase 5: Web integration
@@ -434,6 +445,9 @@ Cover cross-provider interactions that single-adapter tests miss:
 2. **Concurrent active sessions** -- Run sessions on two or more different providers simultaneously. Verify events from each session are routed to the correct orchestration thread without cross-contamination.
 3. **Resume cursor isolation** -- Persist resume cursors from two different providers, then attempt to resume each. Confirm that one provider's cursor cannot accidentally be used to resume another provider's session (adapter parse should reject mismatched cursors).
 4. **Provider health monitoring** -- Simulate a provider becoming unavailable (process crash, binary missing). Verify `listProviderStatuses()` reflects the degraded state and that orchestration surfaces a clear error to the client rather than hanging.
+5. **Performance under load** -- Run 10+ concurrent provider sessions across mixed adapters. Monitor memory usage, open file descriptors, and event-delivery latency to ensure the server remains responsive and does not leak resources.
+6. **Chaos scenarios** -- Forcibly kill provider child processes and inject network timeouts mid-stream. Verify that orchestration detects the failure, emits a clear `runtime.error`, and cleans up session resources without leaving zombie processes.
+7. **Resume after ungraceful shutdown** -- Terminate the server (SIGKILL) while sessions are active, then restart. Validate that persisted resume cursors allow sessions to recover and that no corrupted state prevents new sessions from starting.
 
 ---
 

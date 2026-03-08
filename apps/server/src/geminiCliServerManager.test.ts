@@ -133,14 +133,67 @@ describe("GeminiCliServerManager", () => {
         provider: "geminiCli",
         runtimeMode: "full-access",
       });
-      manager.stopSession(asThreadId("thread-1"));
+
+      // Directly mark the session as closed without removing it from the map,
+      // so we exercise the "closed session" branch (not the "unknown session" branch).
+      const sessions = (
+        manager as unknown as { sessions: Map<string, { status: string }> }
+      ).sessions;
+      const session = sessions.get("thread-1");
+      expect(session).toBeDefined();
+      session!.status = "closed";
 
       expect(() =>
         manager.sendTurn({
           threadId: asThreadId("thread-1"),
           input: "hello",
         }),
-      ).toThrow("Unknown Gemini CLI session");
+      ).toThrow("Gemini CLI session is closed");
+    });
+
+    it("rejects when session is already running", async () => {
+      const manager = new GeminiCliServerManager();
+      await manager.startSession({
+        threadId: asThreadId("thread-1"),
+        provider: "geminiCli",
+        runtimeMode: "full-access",
+      });
+
+      // Mark the session as running to simulate an in-progress turn.
+      const sessions = (
+        manager as unknown as { sessions: Map<string, { status: string }> }
+      ).sessions;
+      const session = sessions.get("thread-1");
+      expect(session).toBeDefined();
+      session!.status = "running";
+
+      expect(() =>
+        manager.sendTurn({
+          threadId: asThreadId("thread-1"),
+          input: "hello",
+        }),
+      ).toThrow("Gemini CLI session already running");
+    });
+
+    it("rejects when attachments are provided", async () => {
+      const manager = new GeminiCliServerManager();
+      try {
+        await manager.startSession({
+          threadId: asThreadId("thread-1"),
+          provider: "geminiCli",
+          runtimeMode: "full-access",
+        });
+
+        expect(() =>
+          manager.sendTurn({
+            threadId: asThreadId("thread-1"),
+            input: "hello",
+            attachments: [{ type: "image", url: "https://example.com/img.png" }] as never,
+          }),
+        ).toThrow("does not support attachments");
+      } finally {
+        manager.stopAll();
+      }
     });
   });
 

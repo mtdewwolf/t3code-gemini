@@ -50,6 +50,14 @@ import { type EventNdjsonLogger, makeEventNdjsonLogger } from "./EventNdjsonLogg
 
 const PROVIDER = "claudeCode" as const;
 
+/**
+ * Loose accessor type for SDKMessage dynamic properties that arrive via
+ * the SDK's index signature.  Using this instead of `any` keeps the
+ * declaration file strict (`[key: string]: unknown`) while giving
+ * adapter code ergonomic access to SDK-emitted fields.
+ */
+type SDKMessageLoose = SDKMessage & Record<string, any>; // oxlint-ignore-next-line -- intentional `any` for SDK index access
+
 // ── Module-level usage tracking ──────────────────────────────────────
 
 interface ClaudeCodeUsageAccumulator {
@@ -61,6 +69,8 @@ interface ClaudeCodeUsageAccumulator {
   lastRateLimits: Record<string, unknown> | null;
 }
 
+// Intentionally module-level: aggregates usage across all Claude Code sessions
+// for the global usage display shown in the UI sidebar.
 let _claudeUsageAccumulator: ClaudeCodeUsageAccumulator = {
   totalCostUsd: 0,
   inputTokens: 0,
@@ -546,7 +556,7 @@ function sdkMessageSubtype(value: unknown): string | undefined {
   return typeof record.subtype === "string" ? record.subtype : undefined;
 }
 
-function sdkNativeMethod(message: SDKMessage): string {
+function sdkNativeMethod(message: SDKMessageLoose): string {
   const subtype = sdkMessageSubtype(message);
   if (subtype) {
     return `claude/${message.type}/${subtype}`;
@@ -569,7 +579,7 @@ function sdkNativeMethod(message: SDKMessage): string {
   return `claude/${message.type}`;
 }
 
-function sdkNativeItemId(message: SDKMessage): string | undefined {
+function sdkNativeItemId(message: SDKMessageLoose): string | undefined {
   if (message.type === "assistant") {
     const maybeId = (message.message as { id?: unknown }).id;
     if (typeof maybeId === "string") {
@@ -915,7 +925,7 @@ function makeClaudeCodeAdapter(options?: ClaudeCodeAdapterLiveOptions) {
 
     const handleStreamEvent = (
       context: ClaudeSessionContext,
-      message: SDKMessage,
+      message: SDKMessageLoose,
     ): Effect.Effect<void> =>
       Effect.gen(function* () {
         if (message.type !== "stream_event") {
@@ -1138,7 +1148,7 @@ function makeClaudeCodeAdapter(options?: ClaudeCodeAdapterLiveOptions) {
 
     const handleSystemMessage = (
       context: ClaudeSessionContext,
-      message: SDKMessage,
+      message: SDKMessageLoose,
     ): Effect.Effect<void> =>
       Effect.gen(function* () {
         if (message.type !== "system") {
@@ -1301,7 +1311,7 @@ function makeClaudeCodeAdapter(options?: ClaudeCodeAdapterLiveOptions) {
 
     const handleSdkTelemetryMessage = (
       context: ClaudeSessionContext,
-      message: SDKMessage,
+      message: SDKMessageLoose,
     ): Effect.Effect<void> =>
       Effect.gen(function* () {
         const stamp = yield* makeEventStamp();
@@ -1379,7 +1389,7 @@ function makeClaudeCodeAdapter(options?: ClaudeCodeAdapterLiveOptions) {
 
     const handleSdkMessage = (
       context: ClaudeSessionContext,
-      message: SDKMessage,
+      message: SDKMessageLoose,
     ): Effect.Effect<void> =>
       Effect.gen(function* () {
         yield* logNativeSdkMessage(context, message);

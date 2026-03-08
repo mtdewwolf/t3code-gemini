@@ -69,22 +69,22 @@ declare module "@anthropic-ai/claude-agent-sdk" {
       readonly content?: ReadonlyArray<unknown>;
       readonly [key: string]: unknown;
     };
-    readonly content?: ReadonlyArray<Record<string, any>>;
+    readonly content?: ReadonlyArray<Record<string, unknown>>;
     readonly uuid?: string;
     readonly session_id?: string;
     readonly parent_tool_use_id?: string;
     readonly tool_use_id?: string;
     readonly tool_name?: string;
-    readonly input?: Record<string, any>;
+    readonly input?: Record<string, unknown>;
     readonly result?: string;
     readonly error?: string;
     readonly errors?: ReadonlyArray<unknown>;
-    readonly content_block?: Record<string, any>;
+    readonly content_block?: Record<string, unknown>;
     readonly index?: number;
     readonly preceding_tool_use_ids?: ReadonlyArray<string>;
     readonly is_error?: boolean;
     readonly suggestions?: ReadonlyArray<PermissionUpdate>;
-    readonly [key: string]: any;
+    readonly [key: string]: unknown;
   }
 
   export interface Options {

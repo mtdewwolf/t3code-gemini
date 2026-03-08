@@ -26,14 +26,17 @@ function tryRunGit(args) {
 }
 
 function deriveRepoUrl(remoteName) {
-  const remoteUrl = tryRunGit(["remote", "get-url", remoteName]);
+  let remoteUrl = tryRunGit(["remote", "get-url", remoteName]);
   if (!remoteUrl) return null;
 
-  // Handle SSH (git@github.com:owner/repo.git) and HTTPS (https://github.com/owner/repo.git)
-  const sshMatch = remoteUrl.match(/git@([^:]+):(.+?)(?:\.git)?$/);
+  // Strip trailing .git before matching so it never leaks into the result.
+  remoteUrl = remoteUrl.replace(/\.git$/, "");
+
+  // Handle SSH (git@github.com:owner/repo) and HTTPS (https://github.com/owner/repo)
+  const sshMatch = remoteUrl.match(/git@([^:]+):(.+)$/);
   if (sshMatch) return `https://${sshMatch[1]}/${sshMatch[2]}`;
 
-  const httpsMatch = remoteUrl.match(/^https?:\/\/(.+?)(?:\.git)?$/);
+  const httpsMatch = remoteUrl.match(/^https?:\/\/(.+)$/);
   if (httpsMatch) return `https://${httpsMatch[1]}`;
 
   return null;

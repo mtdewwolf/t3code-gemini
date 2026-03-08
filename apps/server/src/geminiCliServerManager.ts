@@ -239,6 +239,14 @@ export class GeminiCliServerManager extends EventEmitter<{
     if (session.status === "closed") {
       throw new Error(`Gemini CLI session is closed: ${input.threadId}`);
     }
+    if (session.status === "running") {
+      throw new Error(`Gemini CLI session already running: ${input.threadId}`);
+    }
+
+    // Reject attachments — Gemini CLI doesn't support them.
+    if (input.attachments && input.attachments.length > 0) {
+      throw new Error("Gemini CLI does not support attachments");
+    }
 
     const turnId = TurnId.makeUnsafe(randomUUID());
     session.activeTurnId = turnId;
@@ -248,6 +256,9 @@ export class GeminiCliServerManager extends EventEmitter<{
     session.activeAssistantItemId = undefined;
 
     const prompt = input.input ?? "";
+
+    // Use per-turn model override if provided, otherwise fall back to session model.
+    const effectiveModel = input.model ?? session.model;
 
     // Build args for headless mode with stream-json output.
     const args: string[] = [
@@ -259,8 +270,8 @@ export class GeminiCliServerManager extends EventEmitter<{
       resolveApprovalMode(session.runtimeMode),
     ];
 
-    if (session.model) {
-      args.push("-m", session.model);
+    if (effectiveModel) {
+      args.push("-m", effectiveModel);
     }
 
     // Resume previous Gemini session for follow-up turns.
@@ -296,20 +307,21 @@ export class GeminiCliServerManager extends EventEmitter<{
 
       s.activeProcess = undefined;
 
-      // If the turn wasn't already completed by a "result" event, mark it.
+      // If the turn wasn't already completed by a "result" event, emit a terminal turn.completed.
       if (s.status === "running" && s.activeTurnId === turnId) {
         s.status = "ready";
         s.updatedAt = new Date().toISOString();
 
-        if (code !== 0) {
-          this.emitEvent(input.threadId, turnId, {
-            type: "turn.completed",
-            payload: {
-              state: "failed",
-              errorMessage: `Gemini CLI exited with code ${code}`,
-            },
-          });
-        }
+        this.emitEvent(input.threadId, turnId, {
+          type: "turn.completed",
+          payload:
+            code === 0
+              ? { state: "completed" }
+              : {
+                  state: "failed",
+                  errorMessage: `Gemini CLI exited with code ${code}`,
+                },
+        });
       }
     });
 

@@ -87,7 +87,7 @@ interface ActiveCopilotSession {
   session: CopilotSessionHandle;
   readonly threadId: ThreadId;
   readonly createdAt: string;
-  readonly runtimeMode: ProviderSession["runtimeMode"];
+  runtimeMode: ProviderSession["runtimeMode"];
   cwd: string | undefined;
   configDir: string | undefined;
   model: string | undefined;
@@ -1013,8 +1013,6 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
           const sessionId = record.session.sessionId;
           const previousSession = record.session;
           const previousUnsubscribe = record.unsubscribe;
-          previousUnsubscribe();
-          await previousSession.destroy();
 
           const handlers = createInteractionHandlers(
             record.threadId,
@@ -1031,6 +1029,10 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
             ...(record.configDir ? { configDir: record.configDir } : {}),
             streaming: true,
           });
+
+          // Only destroy the old session after the new one has been created successfully
+          previousUnsubscribe();
+          await previousSession.destroy();
 
           record.session = nextSession;
           record.model = input.model;
@@ -1171,6 +1173,8 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
 
         const existing = sessions.get(input.threadId);
         if (existing) {
+          existing.runtimeMode = input.runtimeMode;
+          existing.updatedAt = new Date().toISOString();
           return {
             provider: PROVIDER,
             status: "ready",
@@ -1217,8 +1221,18 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
 
         const session = yield* Effect.tryPromise({
           try: async () => {
-            if (resumeSessionId) {
-              return client.resumeSession(resumeSessionId, {
+            try {
+              if (resumeSessionId) {
+                return await client.resumeSession(resumeSessionId, {
+                  ...handlers,
+                  ...(input.model ? { model: input.model } : {}),
+                  ...(reasoningEffort ? { reasoningEffort } : {}),
+                  ...(input.cwd ? { workingDirectory: input.cwd } : {}),
+                  ...(configDir ? { configDir } : {}),
+                  streaming: true,
+                });
+              }
+              return await client.createSession({
                 ...handlers,
                 ...(input.model ? { model: input.model } : {}),
                 ...(reasoningEffort ? { reasoningEffort } : {}),
@@ -1226,15 +1240,10 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
                 ...(configDir ? { configDir } : {}),
                 streaming: true,
               });
+            } catch (err) {
+              await client.stop().catch(() => {});
+              throw err;
             }
-            return client.createSession({
-              ...handlers,
-              ...(input.model ? { model: input.model } : {}),
-              ...(reasoningEffort ? { reasoningEffort } : {}),
-              ...(input.cwd ? { workingDirectory: input.cwd } : {}),
-              ...(configDir ? { configDir } : {}),
-              streaming: true,
-            });
           },
           catch: (cause) =>
             new ProviderAdapterProcessError({
@@ -1754,7 +1763,7 @@ function parseCopilotInternalResponse(data: Record<string, unknown>): ProviderUs
     ...(used !== undefined ? { used } : {}),
     ...(limit !== undefined ? { limit } : {}),
     ...(resetDate ? { resetDate } : {}),
-    ...(limit !== undefined && used !== undefined
+    ...(limit !== undefined && limit > 0 && used !== undefined
       ? { percentUsed: Math.round((used / limit) * 100) }
       : {}),
   };

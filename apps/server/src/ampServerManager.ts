@@ -20,6 +20,7 @@ import {
 } from "@t3tools/contracts";
 import type { ProviderSessionUsage, ProviderUsageResult } from "@t3tools/contracts";
 import type { ProviderThreadSnapshot } from "./provider/Services/ProviderAdapter.ts";
+import { createLogger } from "./logger.ts";
 
 // ── Constants ───────────────────────────────────────────────────────
 
@@ -78,6 +79,8 @@ interface AmpSession {
   activeAssistantItemId: RuntimeItemId | undefined;
   /** Maps parent_tool_use_id → RuntimeTaskId for tracking subagent tasks. */
   readonly subagentTasks: Map<string, string>;
+  /** Maps tool_use_id → classified item type for consistent start/completion typing. */
+  readonly toolItemTypes: Map<string, ReturnType<typeof classifyToolName>>;
   readonly createdAt: string;
   updatedAt: string;
 }
@@ -167,6 +170,7 @@ export class AmpServerManager extends EventEmitter<{
   event: [ProviderRuntimeEvent];
 }> {
   private readonly sessions = new Map<ThreadId, AmpSession>();
+  private readonly logger = createLogger("amp");
 
   // ── Session lifecycle ───────────────────────────────────────────
 
@@ -211,6 +215,7 @@ export class AmpServerManager extends EventEmitter<{
       activeTurnId: undefined,
       activeAssistantItemId: undefined,
       subagentTasks: new Map(),
+      toolItemTypes: new Map(),
       createdAt: now,
       updatedAt: now,
     };
@@ -237,6 +242,17 @@ export class AmpServerManager extends EventEmitter<{
     child.on("close", (code) => {
       const s = this.sessions.get(threadId);
       if (s) {
+        if (s.activeTurnId) {
+          this.emitEvent(threadId, s.activeTurnId, {
+            type: "turn.completed",
+            payload: {
+              state: "failed",
+              errorMessage: `AMP process exited with code ${code}`,
+            },
+          });
+          s.activeTurnId = undefined;
+          s.activeAssistantItemId = undefined;
+        }
         s.status = "closed";
         s.updatedAt = new Date().toISOString();
         this.emitEvent(threadId, s.activeTurnId, {
@@ -252,10 +268,21 @@ export class AmpServerManager extends EventEmitter<{
     child.on("error", (error) => {
       const s = this.sessions.get(threadId);
       if (s) {
+        if (s.activeTurnId) {
+          this.emitEvent(threadId, s.activeTurnId, {
+            type: "turn.completed",
+            payload: {
+              state: "failed",
+              errorMessage: `AMP process error: ${error.message}`,
+            },
+          });
+          s.activeTurnId = undefined;
+          s.activeAssistantItemId = undefined;
+        }
         s.status = "closed";
         s.updatedAt = new Date().toISOString();
       }
-      this.emitEvent(threadId, session.activeTurnId, {
+      this.emitEvent(threadId, s?.activeTurnId, {
         type: "runtime.error",
         payload: { message: error.message, class: "transport_error" },
       });
@@ -284,6 +311,11 @@ export class AmpServerManager extends EventEmitter<{
     }
     if (session.status === "closed") {
       throw new Error(`AMP session is closed: ${input.threadId}`);
+    }
+    if (session.status === "running" || session.activeTurnId) {
+      throw new Error(
+        `AMP session ${input.threadId} already has a turn in progress (turn ${session.activeTurnId})`,
+      );
     }
 
     const turnId = TurnId.makeUnsafe(randomUUID());
@@ -419,7 +451,7 @@ export class AmpServerManager extends EventEmitter<{
       msg = JSON.parse(trimmed) as AmpJsonlMessage;
     } catch {
       // Non-JSON output — treat as raw assistant text.
-      console.warn(`[amp] Failed to parse JSONL line, treating as text: ${trimmed.slice(0, 120)}`);
+      this.logger.warn("Failed to parse JSONL line", { length: trimmed.length });
       this.emitEvent(threadId, session.activeTurnId, {
         type: "content.delta",
         payload: {
@@ -533,7 +565,8 @@ export class AmpServerManager extends EventEmitter<{
     }
 
     // For persistent sessions, a turn completes when stop_reason is "end_turn".
-    if (inner?.stop_reason === "end_turn") {
+    // Guard against duplicate turn.completed (handleResultMessage may also emit one).
+    if (inner?.stop_reason === "end_turn" && session.activeTurnId && session.status !== "ready") {
       _ampUsageAccumulator.turnCount++;
       this.closeAllSubagentTasks(threadId, session);
       this.emitEvent(threadId, session.activeTurnId, {
@@ -595,6 +628,7 @@ export class AmpServerManager extends EventEmitter<{
         // A tool use starts a new assistant message segment — clear the active item.
         session.activeAssistantItemId = undefined;
         const itemType = classifyToolName(block.name);
+        session.toolItemTypes.set(block.id, itemType);
         const itemId = RuntimeItemId.makeUnsafe(block.id);
         this.emitEvent(
           threadId,
@@ -680,13 +714,16 @@ export class AmpServerManager extends EventEmitter<{
         if (block.type === "tool_result") {
           const resultBlock = block as AmpToolResultContentBlock;
           const itemId = RuntimeItemId.makeUnsafe(resultBlock.tool_use_id);
+          const itemType =
+            session.toolItemTypes.get(resultBlock.tool_use_id) ?? "dynamic_tool_call";
+          session.toolItemTypes.delete(resultBlock.tool_use_id);
           this.emitEvent(
             threadId,
             session.activeTurnId,
             {
               type: "item.completed",
               payload: {
-                itemType: "dynamic_tool_call",
+                itemType,
                 status: resultBlock.is_error ? "failed" : "completed",
                 data: resultBlock.content,
               },
@@ -705,6 +742,10 @@ export class AmpServerManager extends EventEmitter<{
     session: AmpSession,
     msg: AmpJsonlMessage,
   ): void {
+    // Guard: only complete the turn if one is still active (handleAssistantMessage
+    // may have already completed it via stop_reason === "end_turn").
+    if (!session.activeTurnId || session.status === "ready") return;
+
     // Close all open subagent tasks before completing the turn.
     this.closeAllSubagentTasks(threadId, session);
 
