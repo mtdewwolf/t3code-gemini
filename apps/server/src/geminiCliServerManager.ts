@@ -290,7 +290,7 @@ export class GeminiCliServerManager extends EventEmitter<{
     // Emit turn.started immediately.
     this.emitEvent(input.threadId, turnId, {
       type: "turn.started",
-      payload: { model: session.model },
+      payload: { model: effectiveModel },
     });
 
     const rl = readline.createInterface({ input: child.stdout });
@@ -301,7 +301,7 @@ export class GeminiCliServerManager extends EventEmitter<{
 
     // Ignore stderr (skill conflict warnings, YOLO notices, etc.)
 
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       const s = this.sessions.get(input.threadId);
       if (!s) return;
 
@@ -315,12 +315,14 @@ export class GeminiCliServerManager extends EventEmitter<{
         this.emitEvent(input.threadId, turnId, {
           type: "turn.completed",
           payload:
-            code === 0
-              ? { state: "completed" }
-              : {
-                  state: "failed",
-                  errorMessage: `Gemini CLI exited with code ${code}`,
-                },
+            signal === "SIGINT"
+              ? { state: "interrupted" }
+              : code === 0
+                ? { state: "completed" }
+                : {
+                    state: "failed",
+                    errorMessage: `Gemini CLI exited with code ${code}`,
+                  },
         });
       }
     });
@@ -358,8 +360,6 @@ export class GeminiCliServerManager extends EventEmitter<{
     }
     if (session.status === "running" && session.activeProcess) {
       session.activeProcess.kill("SIGINT");
-      session.status = "ready";
-      session.updatedAt = new Date().toISOString();
     }
     return Promise.resolve();
   }
@@ -399,7 +399,7 @@ export class GeminiCliServerManager extends EventEmitter<{
     for (const session of this.sessions.values()) {
       sessions.push({
         provider: PROVIDER,
-        status: session.status === "closed" ? "closed" : "ready",
+        status: session.status,
         runtimeMode: session.runtimeMode as ProviderSession["runtimeMode"],
         threadId: session.threadId,
         cwd: session.cwd,

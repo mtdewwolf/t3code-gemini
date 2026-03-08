@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 
 import {
+  type CanonicalItemType,
   type CodexReasoningEffort,
   EventId,
   type ProviderApprovalDecision,
@@ -98,6 +99,7 @@ interface ActiveCopilotSession {
   currentProviderTurnId: TurnId | undefined;
   pendingTurnIds: Array<TurnId>;
   toolTitlesByCallId: Map<string, string>;
+  toolItemTypeByCallId: Map<string, CanonicalItemType>;
   pendingApprovalResolvers: Map<string, PendingApprovalRequest>;
   pendingUserInputResolvers: Map<string, PendingUserInputRequest>;
   unsubscribe: () => void;
@@ -131,6 +133,7 @@ function createSessionRecord(input: {
     currentProviderTurnId: undefined,
     pendingTurnIds: [],
     toolTitlesByCallId: new Map(),
+    toolItemTypeByCallId: new Map(),
     pendingApprovalResolvers: input.pendingApprovalResolvers,
     pendingUserInputResolvers: input.pendingUserInputResolvers,
     unsubscribe: () => undefined,
@@ -284,7 +287,7 @@ function requestDetailFromPermissionRequest(request: PermissionRequest): string 
   }
 }
 
-function itemTypeFromToolEvent(event: Extract<SessionEvent, { type: "tool.execution_start" }>) {
+function itemTypeFromToolEvent(event: Extract<SessionEvent, { type: "tool.execution_start" }>): CanonicalItemType {
   return event.data.mcpToolName ? "mcp_tool_call" : "dynamic_tool_call";
 }
 
@@ -529,15 +532,22 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
           // signal — it fires after assistant.turn_end and
           // assistant.usage have completed. Emit turn.completed here
           // so the orchestration layer settles the turn cleanly.
+          // If a session.error preceded idle, finalize the turn as
+          // failed so the UI does not incorrectly show success.
           return [
             ...(currentTurnId
               ? [
                   {
                     ...base({ providerTurnId: currentProviderTurnId }),
                     type: "turn.completed" as const,
-                    payload: {
-                      state: "completed" as const,
-                    },
+                    payload: record.lastError
+                      ? {
+                          state: "failed" as const,
+                          errorMessage: record.lastError,
+                        }
+                      : {
+                          state: "completed" as const,
+                        },
                   },
                 ]
               : []),
@@ -774,11 +784,7 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
               ...base({ itemId: event.data.toolCallId }),
               type: "item.completed",
               payload: {
-                itemType: event.data.result?.contents?.some(
-                  (content: { type?: string }) => content.type === "terminal",
-                )
-                  ? "command_execution"
-                  : "dynamic_tool_call",
+                itemType: record.toolItemTypeByCallId.get(event.data.toolCallId) ?? "dynamic_tool_call",
                 status: event.data.success ? "completed" : "failed",
                 title: record.toolTitlesByCallId.get(event.data.toolCallId) ?? "Tool call",
                 ...(trimToUndefined(event.data.result?.content) ? { detail: event.data.result?.content } : {}),
@@ -1064,8 +1070,11 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
       if (event.type === "session.model_change") {
         record.model = event.data.newModel;
       }
-      if (event.type === "tool.execution_start" && trimToUndefined(event.data.toolName)) {
-        record.toolTitlesByCallId.set(event.data.toolCallId, trimToUndefined(event.data.toolName)!);
+      if (event.type === "tool.execution_start") {
+        if (trimToUndefined(event.data.toolName)) {
+          record.toolTitlesByCallId.set(event.data.toolCallId, trimToUndefined(event.data.toolName)!);
+        }
+        record.toolItemTypeByCallId.set(event.data.toolCallId, itemTypeFromToolEvent(event));
       }
 
       void writeNativeEvent(record.threadId, event);
@@ -1075,6 +1084,7 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
       }
       if (event.type === "tool.execution_complete") {
         record.toolTitlesByCallId.delete(event.data.toolCallId);
+        record.toolItemTypeByCallId.delete(event.data.toolCallId);
       }
       if (event.type === "abort" || event.type === "session.idle") {
         // If the turn terminates before assistant.turn_start consumed the
@@ -1087,6 +1097,11 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
         }
         record.currentTurnId = undefined;
         record.currentProviderTurnId = undefined;
+        // Clear the error after the idle handler has consumed it for
+        // turn.completed so it doesn't leak into subsequent turns.
+        if (event.type === "session.idle") {
+          record.lastError = undefined;
+        }
       }
     };
 
@@ -1217,7 +1232,12 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
           threadId: input.threadId,
           model: input.model,
           reasoningEffort,
-        });
+        }).pipe(
+          // validateSessionConfiguration may call client.start() internally.
+          // If validation fails after that, stop the client to avoid leaking
+          // a running process.
+          Effect.tapError(() => Effect.promise(() => client.stop().catch(() => {}))),
+        );
 
         const session = yield* Effect.tryPromise({
           try: async () => {

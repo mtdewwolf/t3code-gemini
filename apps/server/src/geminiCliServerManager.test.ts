@@ -323,8 +323,11 @@ describe("GeminiCliServerManager JSON event mapping", () => {
 
     // init doesn't emit a provider event, but we can verify the session ID
     // was captured by checking that a subsequent sendTurn would use --resume.
-    // For now just verify no event was emitted (init is internal bookkeeping).
     expect(events).toHaveLength(0);
+
+    // Verify the session_id was actually stored for --resume on subsequent turns.
+    const sessions = (manager as unknown as { sessions: Map<string, { geminiSessionId?: string }> }).sessions;
+    expect(sessions.get("thread-json")?.geminiSessionId).toBe("gemini-sess-abc");
   });
 
   it("maps assistant message deltas to content.delta events with stable itemId", () => {

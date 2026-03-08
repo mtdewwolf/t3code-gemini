@@ -32,10 +32,15 @@ function deriveRepoUrl(remoteName) {
   // Strip trailing .git before matching so it never leaks into the result.
   remoteUrl = remoteUrl.replace(/\.git$/, "");
 
-  // Handle SSH (git@github.com:owner/repo) and HTTPS (https://github.com/owner/repo)
-  const sshMatch = remoteUrl.match(/git@([^:]+):(.+)$/);
+  // Handle scp-style SSH (git@github.com:owner/repo)
+  const scpMatch = remoteUrl.match(/git@([^:]+):(.+)$/);
+  if (scpMatch) return `https://${scpMatch[1]}/${scpMatch[2]}`;
+
+  // Handle ssh:// protocol (ssh://git@github.com/owner/repo)
+  const sshMatch = remoteUrl.match(/^ssh:\/\/[^@]+@([^/]+)\/(.+)$/);
   if (sshMatch) return `https://${sshMatch[1]}/${sshMatch[2]}`;
 
+  // Handle HTTPS (https://github.com/owner/repo)
   const httpsMatch = remoteUrl.match(/^https?:\/\/(.+)$/);
   if (httpsMatch) return `https://${httpsMatch[1]}`;
 
@@ -53,6 +58,12 @@ function loadConfig() {
   }
   // Derive the repo URL from the upstream remote instead of hardcoding it.
   parsed.repoUrl = deriveRepoUrl(parsed.upstreamRemote) ?? deriveRepoUrl(parsed.forkRemote);
+  if (!parsed.repoUrl) {
+    throw new Error(
+      `Could not derive repo URL from remotes "${parsed.upstreamRemote}" or "${parsed.forkRemote}". ` +
+        "Ensure at least one remote uses an HTTPS, scp-style SSH, or ssh:// URL.",
+    );
+  }
   return parsed;
 }
 
@@ -113,7 +124,7 @@ function main() {
     const integrationSummary = getComparisonSummary(integrationBranch, pr.localBranch);
 
     formatSection(`PR #${pr.number}: ${pr.title}`);
-    console.log(`URL: ${config.repoUrl ?? "https://github.com/pingdotgg/t3code"}/pull/${pr.number}`);
+    console.log(`URL: ${config.repoUrl}/pull/${pr.number}`);
     console.log(`Tracking branch: ${pr.localBranch}`);
     console.log(`Branch SHA: ${branchSha}`);
     console.log(`Merge base with ${baseBranch}: ${baseSummary.mergeBase ?? "(missing)"}`);

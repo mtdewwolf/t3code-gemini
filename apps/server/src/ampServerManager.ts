@@ -81,6 +81,8 @@ interface AmpSession {
   readonly subagentTasks: Map<string, string>;
   /** Maps tool_use_id → classified item type for consistent start/completion typing. */
   readonly toolItemTypes: Map<string, ReturnType<typeof classifyToolName>>;
+  /** Set to true when stopSession is called so close/error handlers know to delete the session. */
+  closing: boolean;
   readonly createdAt: string;
   updatedAt: string;
 }
@@ -216,6 +218,7 @@ export class AmpServerManager extends EventEmitter<{
       activeAssistantItemId: undefined,
       subagentTasks: new Map(),
       toolItemTypes: new Map(),
+      closing: false,
       createdAt: now,
       updatedAt: now,
     };
@@ -262,6 +265,9 @@ export class AmpServerManager extends EventEmitter<{
             exitKind: code === 0 ? "graceful" : "error",
           },
         });
+        if (s.closing) {
+          this.sessions.delete(threadId);
+        }
       }
     });
 
@@ -286,6 +292,9 @@ export class AmpServerManager extends EventEmitter<{
         type: "runtime.error",
         payload: { message: error.message, class: "transport_error" },
       });
+      if (s?.closing) {
+        this.sessions.delete(threadId);
+      }
     });
 
     const providerSession: ProviderSession = {
@@ -316,6 +325,9 @@ export class AmpServerManager extends EventEmitter<{
       throw new Error(
         `AMP session ${input.threadId} already has a turn in progress (turn ${session.activeTurnId})`,
       );
+    }
+    if (input.attachments && input.attachments.length > 0) {
+      throw new Error("Attachments are not supported by AMP");
     }
 
     const turnId = TurnId.makeUnsafe(randomUUID());
@@ -356,8 +368,6 @@ export class AmpServerManager extends EventEmitter<{
     }
     if (session.status === "running") {
       session.process.kill("SIGINT");
-      session.status = "ready";
-      session.updatedAt = new Date().toISOString();
     }
     return Promise.resolve();
   }
@@ -385,13 +395,14 @@ export class AmpServerManager extends EventEmitter<{
   stopSession(threadId: ThreadId): void {
     const session = this.sessions.get(threadId);
     if (!session) return;
+    session.closing = true;
     try {
       session.process.kill();
     } catch {
-      // Process may already be dead.
+      // Process may already be dead — clean up immediately since handlers won't fire.
+      session.status = "closed";
+      this.sessions.delete(threadId);
     }
-    session.status = "closed";
-    this.sessions.delete(threadId);
   }
 
   // ── Listing / introspection ───────────────────────────────────────

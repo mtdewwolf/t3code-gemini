@@ -359,9 +359,14 @@ function classifyRequestType(toolName: string): CanonicalRequestType {
   if (normalized === "read" || normalized.includes("read file") || normalized.includes("view")) {
     return "file_read_approval";
   }
-  return classifyToolItemType(toolName) === "command_execution"
-    ? "command_execution_approval"
-    : "file_change_approval";
+  switch (classifyToolItemType(toolName)) {
+    case "command_execution":
+      return "command_execution_approval";
+    case "file_change":
+      return "file_change_approval";
+    default:
+      return "dynamic_tool_call";
+  }
 }
 
 function summarizeToolRequest(toolName: string, input: Record<string, unknown>): string {
@@ -918,7 +923,7 @@ function makeClaudeCodeAdapter(options?: ClaudeCodeAdapterLiveOptions) {
           status: "ready",
           activeTurnId: undefined,
           updatedAt,
-          ...(status === "failed" && errorMessage ? { lastError: errorMessage } : {}),
+          lastError: status === "failed" && errorMessage ? errorMessage : undefined,
         };
         yield* updateResumeCursor(context);
       });
@@ -1859,6 +1864,7 @@ function makeClaudeCodeAdapter(options?: ClaudeCodeAdapterLiveOptions) {
           status: "running",
           activeTurnId: turnId,
           updatedAt,
+          lastError: undefined,
         };
 
         const turnStartedStamp = yield* makeEventStamp();

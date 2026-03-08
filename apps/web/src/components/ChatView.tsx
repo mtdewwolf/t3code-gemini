@@ -883,18 +883,9 @@ export default function ChatView({ threadId }: ChatViewProps) {
     selectedProvider === "cursor" && selectedCursorModel
       ? selectedCursorModel.family
       : selectedModel;
-  const copilotModelsQuery = useQuery({
-    ...providerListModelsQueryOptions("copilot"),
-    staleTime: Infinity,
-  });
-  const opencodeModelsQuery = useQuery({
-    ...providerListModelsQueryOptions("opencode"),
-    staleTime: Infinity,
-  });
-  const kiloModelsQuery = useQuery({
-    ...providerListModelsQueryOptions("kilo"),
-    staleTime: Infinity,
-  });
+  const copilotModelsQuery = useQuery(providerListModelsQueryOptions("copilot"));
+  const opencodeModelsQuery = useQuery(providerListModelsQueryOptions("opencode"));
+  const kiloModelsQuery = useQuery(providerListModelsQueryOptions("kilo"));
   const modelOptionsByProvider = useMemo(
     () =>
       mergeDiscoveredModels(getCustomModelOptionsByProvider(settings), {
@@ -5794,7 +5785,14 @@ const ProviderModelPicker = memo(function ProviderModelPicker(props: {
                                   value={modelOption.slug}
                                   onClick={() => setIsMenuOpen(false)}
                                 >
-                                  {modelOption.name}
+                                  <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                                    <span className="truncate">{modelOption.name}</span>
+                                    {modelOption.pricingTier ? (
+                                      <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+                                        {formatPricingTier(modelOption.pricingTier)}
+                                      </span>
+                                    ) : null}
+                                  </span>
                                 </MenuRadioItem>
                               ))}
                             </MenuRadioGroup>

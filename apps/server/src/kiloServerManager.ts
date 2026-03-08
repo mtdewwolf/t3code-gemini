@@ -463,9 +463,14 @@ async function probeServer(baseUrl: string, authHeader?: string): Promise<boolea
   return response?.ok === true;
 }
 
-function readResumeSessionId(resumeCursor: unknown): string | undefined {
+function readResumeState(
+  resumeCursor: unknown,
+): { sessionId: string; workspace?: string } | undefined {
   const record = asRecord(resumeCursor);
-  return asString(record?.sessionId);
+  const sessionId = asString(record?.sessionId);
+  if (!sessionId) return undefined;
+  const workspace = asString(record?.workspace);
+  return { sessionId, ...(workspace ? { workspace } : {}) };
 }
 
 function parseOpencodeModel(model: string | undefined):
@@ -740,7 +745,8 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
 
     const directory = kiloInput.cwd ?? process.cwd();
     const options = kiloInput.providerOptions?.kilo;
-    const workspace = options?.workspace;
+    const resumeState = readResumeState(kiloInput.resumeCursor);
+    const workspace = options?.workspace ?? resumeState?.workspace;
     const sharedServer = await this.ensureServer(options);
     const client = await this.createClient({
       baseUrl: sharedServer.baseUrl,
@@ -756,7 +762,7 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
         : {}),
     });
 
-    const resumedSessionId = readResumeSessionId(kiloInput.resumeCursor);
+    const resumedSessionId = resumeState?.sessionId;
     const resumedSession = resumedSessionId
       ? await client.session
           .get({
@@ -859,6 +865,11 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
     }
     const kiloInput = input as KiloSendTurnInput;
     const context = this.requireSession(input.threadId);
+    if (context.activeTurnId) {
+      throw new Error(
+        `Kilo thread '${input.threadId}' already has an active turn '${context.activeTurnId}'`,
+      );
+    }
     const turnId = createTurnId();
     const agent =
       kiloInput.modelOptions?.kilo?.agent ??
@@ -983,6 +994,20 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
       sessionID: context.providerSessionId,
       ...(context.workspace ? { workspace: context.workspace } : {}),
     });
+    const interruptedTurnId = context.activeTurnId;
+    if (interruptedTurnId) {
+      this.emitRuntimeEvent({
+        type: "turn.completed",
+        eventId: eventId("kilo-turn-interrupted"),
+        provider: PROVIDER,
+        threadId,
+        createdAt: nowIso(),
+        turnId: interruptedTurnId,
+        payload: {
+          state: "interrupted",
+        },
+      });
+    }
     context.activeTurnId = undefined;
     context.session = {
       ...stripTransientSessionFields(context.session),
@@ -1288,18 +1313,34 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
         updatedAt: nowIso(),
         lastError: message,
       };
+      const failedTurnId = context.activeTurnId;
       this.emitRuntimeEvent({
         type: "runtime.error",
         eventId: eventId("kilo-stream-error"),
         provider: PROVIDER,
         threadId: context.threadId,
         createdAt: nowIso(),
-        ...(context.activeTurnId ? { turnId: context.activeTurnId } : {}),
+        ...(failedTurnId ? { turnId: failedTurnId } : {}),
         payload: {
           message,
           class: "transport_error",
         },
       });
+      if (failedTurnId) {
+        this.emitRuntimeEvent({
+          type: "turn.completed",
+          eventId: eventId("kilo-stream-error-turn-completed"),
+          provider: PROVIDER,
+          threadId: context.threadId,
+          createdAt: nowIso(),
+          turnId: failedTurnId,
+          payload: {
+            state: "failed",
+            errorMessage: message,
+          },
+        });
+        context.activeTurnId = undefined;
+      }
     }
   }
 
