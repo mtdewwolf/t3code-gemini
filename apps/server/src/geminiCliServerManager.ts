@@ -220,7 +220,7 @@ export class GeminiCliServerManager extends EventEmitter<{
     const providerSession: ProviderSession = {
       provider: PROVIDER,
       status: "ready",
-      runtimeMode: input.runtimeMode,
+      runtimeMode: session.runtimeMode as ProviderSession["runtimeMode"],
       threadId,
       cwd,
       model: input.model,
@@ -312,6 +312,9 @@ export class GeminiCliServerManager extends EventEmitter<{
         s.status = "ready";
         s.updatedAt = new Date().toISOString();
 
+        // Flush any open assistant message or tool items that never received completion.
+        this.finalizeOpenItems(input.threadId, turnId, s);
+
         this.emitEvent(input.threadId, turnId, {
           type: "turn.completed",
           payload:
@@ -333,6 +336,9 @@ export class GeminiCliServerManager extends EventEmitter<{
         s.activeProcess = undefined;
         s.status = "ready";
         s.updatedAt = new Date().toISOString();
+
+        // Flush any open assistant message or tool items that never received completion.
+        this.finalizeOpenItems(input.threadId, turnId, s);
       }
       this.emitEvent(input.threadId, turnId, {
         type: "runtime.error",
@@ -587,6 +593,34 @@ export class GeminiCliServerManager extends EventEmitter<{
         });
         break;
       }
+    }
+  }
+
+  /** Flush any open assistant message and tool items that never received a matching completed event. */
+  private finalizeOpenItems(threadId: ThreadId, turnId: TurnId, session: GeminiCliSession): void {
+    if (session.activeAssistantItemId) {
+      this.emitEvent(threadId, turnId, {
+        type: "item.completed",
+        itemId: session.activeAssistantItemId,
+        payload: {
+          itemType: "assistant_message",
+          status: "completed",
+        },
+      });
+      session.activeAssistantItemId = undefined;
+    }
+
+    for (const [toolId, tool] of session.activeToolItems) {
+      this.emitEvent(threadId, turnId, {
+        type: "item.completed",
+        itemId: tool.itemId,
+        payload: {
+          itemType: "command_execution",
+          status: "failed",
+          title: tool.toolName,
+        },
+      });
+      session.activeToolItems.delete(toolId);
     }
   }
 

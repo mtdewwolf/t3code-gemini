@@ -886,14 +886,18 @@ export default function ChatView({ threadId }: ChatViewProps) {
   const copilotModelsQuery = useQuery(providerListModelsQueryOptions("copilot"));
   const opencodeModelsQuery = useQuery(providerListModelsQueryOptions("opencode"));
   const kiloModelsQuery = useQuery(providerListModelsQueryOptions("kilo"));
+  const geminiCliModelsQuery = useQuery(providerListModelsQueryOptions("geminiCli"));
+  const ampModelsQuery = useQuery(providerListModelsQueryOptions("amp"));
   const modelOptionsByProvider = useMemo(
     () =>
       mergeDiscoveredModels(getCustomModelOptionsByProvider(settings), {
         copilot: copilotModelsQuery.data,
         opencode: opencodeModelsQuery.data,
         kilo: kiloModelsQuery.data,
+        geminiCli: geminiCliModelsQuery.data,
+        amp: ampModelsQuery.data,
       }),
-    [settings, copilotModelsQuery.data, opencodeModelsQuery.data, kiloModelsQuery.data],
+    [settings, copilotModelsQuery.data, opencodeModelsQuery.data, kiloModelsQuery.data, geminiCliModelsQuery.data, ampModelsQuery.data],
   );
   const selectedModelForPickerWithCustomFallback = useMemo(() => {
     if (selectedProvider !== "cursor") {
@@ -3002,6 +3006,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
           },
           provider: selectedProvider,
           model: selectedModel || undefined,
+          serviceTier: selectedServiceTier,
           ...(selectedModelOptionsForDispatch
             ? { modelOptions: selectedModelOptionsForDispatch }
             : {}),
@@ -3036,6 +3041,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
       selectedModel,
       selectedModelOptionsForDispatch,
       selectedProvider,
+      selectedServiceTier,
       setComposerDraftInteractionMode,
       setThreadError,
       settings.enableAssistantStreaming,
@@ -3102,6 +3108,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
           },
           provider: selectedProvider,
           model: selectedModel || undefined,
+          serviceTier: selectedServiceTier,
           ...(selectedModelOptionsForDispatch
             ? { modelOptions: selectedModelOptionsForDispatch }
             : {}),
@@ -3155,6 +3162,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
     selectedModel,
     selectedModelOptionsForDispatch,
     selectedProvider,
+    selectedServiceTier,
     settings.enableAssistantStreaming,
     syncServerReadModel,
   ]);

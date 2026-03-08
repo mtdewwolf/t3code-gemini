@@ -1552,12 +1552,6 @@ function makeClaudeCodeAdapter(options?: ClaudeCodeAdapterLiveOptions) {
         const resumeState = readClaudeResumeState(input.resumeCursor);
         const threadId = resumeState?.threadId ?? input.threadId;
 
-        // Guard against duplicate threadId: stop/cleanup any existing session before creating a new one.
-        const existingContext = sessions.get(threadId);
-        if (existingContext) {
-          yield* stopSessionInternal(existingContext, { emitExitEvent: true });
-        }
-
         const promptQueue = yield* Queue.unbounded<PromptQueueItem>();
         const prompt = Stream.fromQueue(promptQueue).pipe(
           Stream.filter((item) => item.type === "message"),
@@ -1740,6 +1734,13 @@ function makeClaudeCodeAdapter(options?: ClaudeCodeAdapterLiveOptions) {
             }),
         });
 
+        // Guard against duplicate threadId: stop/cleanup any existing session AFTER the
+        // replacement runtime is successfully created so the thread is never left unusable.
+        const existingContext = sessions.get(threadId);
+        if (existingContext) {
+          yield* stopSessionInternal(existingContext, { emitExitEvent: true });
+        }
+
         const session: ProviderSession = {
           threadId,
           provider: PROVIDER,
@@ -1846,6 +1847,10 @@ function makeClaudeCodeAdapter(options?: ClaudeCodeAdapterLiveOptions) {
           });
         }
 
+        // Validate the user message BEFORE mutating any session state so that
+        // a buildUserMessage failure leaves the session unchanged.
+        const message = yield* buildUserMessage(input);
+
         const turnId = TurnId.makeUnsafe(yield* Random.nextUUIDv4);
         const turnState: ClaudeTurnState = {
           turnId,
@@ -1880,8 +1885,6 @@ function makeClaudeCodeAdapter(options?: ClaudeCodeAdapterLiveOptions) {
             providerTurnId: String(turnId),
           },
         });
-
-        const message = yield* buildUserMessage(input);
 
         yield* Queue.offer(context.promptQueue, {
           type: "message",

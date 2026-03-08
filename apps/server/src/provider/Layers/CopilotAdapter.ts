@@ -1036,10 +1036,7 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
             streaming: true,
           });
 
-          // Only destroy the old session after the new one has been created successfully
-          previousUnsubscribe();
-          await previousSession.destroy();
-
+          // Install the new session immediately so the record is live
           record.session = nextSession;
           record.model = input.model;
           record.reasoningEffort = input.reasoningEffort;
@@ -1047,6 +1044,14 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
           record.unsubscribe = nextSession.on((event) => {
             handleSessionEvent(record, event);
           });
+
+          // Clean up the old session – failures here must not affect the new session
+          previousUnsubscribe();
+          try {
+            await previousSession.destroy();
+          } catch {
+            // Swallow destroy errors; the new session is already installed
+          }
         },
         catch: (cause) =>
           new ProviderAdapterRequestError({
@@ -1334,6 +1339,15 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
     const sendTurn: CopilotAdapterShape["sendTurn"] = (input) =>
       Effect.gen(function* () {
         const record = yield* getSessionRecord(input.threadId);
+
+        if (record.currentTurnId || record.pendingTurnIds.length > 0) {
+          return yield* new ProviderAdapterValidationError({
+            provider: PROVIDER,
+            operation: "sendTurn",
+            issue: `Thread '${input.threadId}' already has an active turn '${record.currentTurnId ?? record.pendingTurnIds[0]}'.`,
+          });
+        }
+
         const explicitReasoningEffort = getCopilotReasoningEffort(input.modelOptions);
         const nextModel = input.model ?? record.model;
         const nextReasoningEffort =

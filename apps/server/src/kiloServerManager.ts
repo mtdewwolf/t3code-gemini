@@ -1842,11 +1842,16 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
   }
 }
 
-export async function fetchKiloModels(options?: KiloModelDiscoveryOptions) {
-  const manager = new KiloServerManager();
+export async function fetchKiloModels(
+  options?: KiloModelDiscoveryOptions,
+  existingManager?: KiloServerManager,
+) {
+  const manager = existingManager ?? new KiloServerManager();
   try {
     return await manager.listModels(options);
   } finally {
-    manager.stopAll();
+    if (!existingManager) {
+      manager.stopAll();
+    }
   }
 }

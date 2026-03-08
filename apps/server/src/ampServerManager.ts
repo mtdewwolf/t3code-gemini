@@ -178,8 +178,13 @@ export class AmpServerManager extends EventEmitter<{
 
   startSession(input: ProviderSessionStartInput): Promise<ProviderSession> {
     const threadId = input.threadId;
-    if (this.sessions.has(threadId)) {
-      throw new Error(`AMP session already exists for thread ${threadId}`);
+    const existing = this.sessions.get(threadId);
+    if (existing) {
+      if (existing.status === "closed") {
+        this.sessions.delete(threadId);
+      } else {
+        throw new Error(`AMP session already exists for thread ${threadId}`);
+      }
     }
 
     const ampOpts = input.providerOptions?.amp as AmpProviderOptions | undefined;
@@ -246,6 +251,8 @@ export class AmpServerManager extends EventEmitter<{
       const s = this.sessions.get(threadId);
       if (s) {
         if (s.activeTurnId) {
+          this.closeAllSubagentTasks(threadId, s);
+          this.drainToolItems(threadId, s);
           this.emitEvent(threadId, s.activeTurnId, {
             type: "turn.completed",
             payload: {
@@ -265,9 +272,7 @@ export class AmpServerManager extends EventEmitter<{
             exitKind: code === 0 ? "graceful" : "error",
           },
         });
-        if (s.closing) {
-          this.sessions.delete(threadId);
-        }
+        this.sessions.delete(threadId);
       }
     });
 
@@ -275,6 +280,8 @@ export class AmpServerManager extends EventEmitter<{
       const s = this.sessions.get(threadId);
       if (s) {
         if (s.activeTurnId) {
+          this.closeAllSubagentTasks(threadId, s);
+          this.drainToolItems(threadId, s);
           this.emitEvent(threadId, s.activeTurnId, {
             type: "turn.completed",
             payload: {
@@ -292,7 +299,7 @@ export class AmpServerManager extends EventEmitter<{
         type: "runtime.error",
         payload: { message: error.message, class: "transport_error" },
       });
-      if (s?.closing) {
+      if (s) {
         this.sessions.delete(threadId);
       }
     });
@@ -331,10 +338,6 @@ export class AmpServerManager extends EventEmitter<{
     }
 
     const turnId = TurnId.makeUnsafe(randomUUID());
-    session.activeTurnId = turnId;
-    session.status = "running";
-    session.updatedAt = new Date().toISOString();
-
     const prompt = input.input ?? "";
 
     // Write a JSONL user message to stdin for the persistent AMP process.
@@ -346,7 +349,19 @@ export class AmpServerManager extends EventEmitter<{
         content: [{ type: "text", text: prompt }],
       },
     });
-    session.process.stdin.write(userMessage + "\n");
+
+    try {
+      session.process.stdin.write(userMessage + "\n");
+    } catch (err) {
+      throw new Error(
+        `Failed to write to AMP stdin for session ${input.threadId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    // Mutations happen only after successful write.
+    session.activeTurnId = turnId;
+    session.status = "running";
+    session.updatedAt = new Date().toISOString();
 
     this.emitEvent(input.threadId, turnId, {
       type: "turn.started",
@@ -428,18 +443,12 @@ export class AmpServerManager extends EventEmitter<{
     return this.sessions.has(threadId);
   }
 
-  readThread(threadId: ThreadId): Promise<ProviderThreadSnapshot> {
-    if (!this.sessions.has(threadId)) {
-      throw new Error(`Unknown AMP session: ${threadId}`);
-    }
-    return Promise.resolve({ threadId, turns: [] });
+  readThread(_threadId: ThreadId): Promise<ProviderThreadSnapshot> {
+    throw new Error("readThread is not supported for AMP provider");
   }
 
-  rollbackThread(threadId: ThreadId): Promise<ProviderThreadSnapshot> {
-    if (!this.sessions.has(threadId)) {
-      throw new Error(`Unknown AMP session: ${threadId}`);
-    }
-    return Promise.resolve({ threadId, turns: [] });
+  rollbackThread(_threadId: ThreadId): Promise<ProviderThreadSnapshot> {
+    throw new Error("rollbackThread is not supported for AMP provider");
   }
 
   stopAll(): void {
@@ -709,6 +718,26 @@ export class AmpServerManager extends EventEmitter<{
       });
     }
     session.subagentTasks.clear();
+  }
+
+  /** Emit item.completed for every remaining open tool item and clear the map. */
+  private drainToolItems(threadId: ThreadId, session: AmpSession): void {
+    for (const [toolUseId, itemType] of session.toolItemTypes) {
+      this.emitEvent(
+        threadId,
+        session.activeTurnId,
+        {
+          type: "item.completed",
+          payload: {
+            itemType,
+            status: "failed",
+            data: null,
+          },
+        },
+        RuntimeItemId.makeUnsafe(toolUseId),
+      );
+    }
+    session.toolItemTypes.clear();
   }
 
   // ── type: "user" ──────────────────────────────────────────────────
