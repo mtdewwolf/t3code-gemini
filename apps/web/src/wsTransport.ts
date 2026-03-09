@@ -44,7 +44,7 @@ export class WsTransport {
         ? bridgeUrl
         : envUrl && envUrl.length > 0
           ? envUrl
-          : `ws://${window.location.hostname}:${window.location.port}`);
+          : `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.hostname}:${window.location.port}`);
     this.connect();
   }
 
@@ -110,6 +110,10 @@ export class WsTransport {
 
     ws.addEventListener("open", () => {
       this.ws = ws;
+      if (this.reconnectTimer !== null) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
       this.reconnectAttempt = 0;
     });
 
@@ -122,8 +126,14 @@ export class WsTransport {
       this.scheduleReconnect();
     });
 
+    // The "close" event always fires after "error", but scheduleReconnect()
+    // guards against double-scheduling via the reconnectTimer check, so both
+    // handlers can safely call it independently.
     ws.addEventListener("error", () => {
-      // close event will fire after error
+      if (this.ws === ws) {
+        this.ws = null;
+      }
+      this.scheduleReconnect();
     });
   }
 
@@ -198,7 +208,7 @@ export class WsTransport {
   }
 
   private scheduleReconnect() {
-    if (this.disposed) return;
+    if (this.disposed || this.reconnectTimer !== null) return;
 
     const delay =
       RECONNECT_DELAYS_MS[Math.min(this.reconnectAttempt, RECONNECT_DELAYS_MS.length - 1)] ??

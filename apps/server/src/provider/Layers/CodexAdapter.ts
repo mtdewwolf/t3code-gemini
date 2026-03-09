@@ -1531,14 +1531,21 @@ function codexBucketToQuota(
   label: string,
 ): ProviderUsageQuota | undefined {
   if (!bucket || bucket.usedPercent == null) return undefined;
-  const resetsAt = bucket.resetsAt
-    ? new Date(bucket.resetsAt * 1000).toISOString().slice(0, 10)
-    : undefined;
+  const resetsAt = bucket.resetsAt ? new Date(bucket.resetsAt * 1000).toISOString() : undefined;
   return {
     plan: label,
     percentUsed: bucket.usedPercent,
     ...(resetsAt ? { resetDate: resetsAt } : {}),
   };
+}
+
+function formatCodexSessionWindowLabel(windowDurationMins: number): string {
+  if (windowDurationMins > 0 && windowDurationMins % 60 === 0) {
+    const hours = windowDurationMins / 60;
+    return `Session (${hours} hr${hours === 1 ? "" : "s"})`;
+  }
+
+  return `Session (${windowDurationMins} min)`;
 }
 
 /**
@@ -1556,7 +1563,7 @@ export async function fetchCodexUsage(): Promise<ProviderUsageResult> {
   }
 
   const sessionLabel = limits.primary?.windowDurationMins
-    ? `Session (${limits.primary.windowDurationMins}min)`
+    ? formatCodexSessionWindowLabel(limits.primary.windowDurationMins)
     : "Session";
   const quotas: ProviderUsageQuota[] = [];
   const sessionQuota = codexBucketToQuota(limits.primary, sessionLabel);
