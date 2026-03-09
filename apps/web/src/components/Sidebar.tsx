@@ -29,6 +29,7 @@ import { useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import { useAppSettings } from "../appSettings";
 import { isElectron } from "../env";
 import { APP_STAGE_LABEL } from "../branding";
+import { resolveThreadProvider } from "../lib/threadProvider";
 import { newCommandId, newProjectId } from "../lib/utils";
 import { useStore } from "../store";
 import { isChatNewLocalShortcut, isChatNewShortcut, shortcutLabelForCommand } from "../keybindings";
@@ -75,6 +76,28 @@ import {
 } from "./ui/sidebar";
 import { formatWorktreePathForDisplay, getOrphanedWorktreePathForThread } from "../worktreeCleanup";
 import { isNonEmpty as isNonEmptyString } from "effect/String";
+import {
+  type Icon,
+  OpenAI,
+  GitHubIcon,
+  ClaudeAI,
+  CursorIcon,
+  OpenCodeIcon,
+  Gemini,
+  AmpIcon,
+  KiloIcon,
+} from "./Icons";
+
+const PROVIDER_ICON_BY_PROVIDER: Record<ProviderKind, Icon> = {
+  codex: OpenAI,
+  copilot: GitHubIcon,
+  claudeCode: ClaudeAI,
+  cursor: CursorIcon,
+  opencode: OpenCodeIcon,
+  geminiCli: Gemini,
+  amp: AmpIcon,
+  kilo: KiloIcon,
+};
 
 const EMPTY_KEYBINDINGS: ResolvedKeybindingsConfig = [];
 const THREAD_PREVIEW_LIMIT = 6;
@@ -620,7 +643,7 @@ function ProviderUsageSection() {
     const data = usageByProvider[provider];
     const showCount = provider === "copilot";
     const hidePlanLabel = provider === "copilot";
-    const hidePercentLabel = provider === "copilot";
+    const hidePercentLabel = false;
     const providerColor = usageSettings.providerAccentColors[provider] || null;
     const colorProp = providerColor ? { accentColor: providerColor } : {};
     // Multiple quotas (e.g. Codex session + weekly)
@@ -1755,6 +1778,8 @@ export default function Sidebar() {
                             selectThreadTerminalState(terminalStateByThreadId, thread.id)
                               .runningTerminalIds,
                           );
+                          const provider = thread.provider ?? resolveThreadProvider(thread);
+                          const ProviderIcon = PROVIDER_ICON_BY_PROVIDER[provider];
 
                           return (
                             <SidebarMenuSubItem key={thread.id} className="w-full">
@@ -1878,6 +1903,22 @@ export default function Sidebar() {
                                   >
                                     {formatRelativeTime(thread.createdAt)}
                                   </span>
+                                  <Tooltip>
+                                    <TooltipTrigger
+                                      render={
+                                        <span
+                                          className={`inline-flex shrink-0 items-center justify-center ${
+                                            isActive
+                                              ? "text-foreground/55"
+                                              : "text-muted-foreground/50"
+                                          } ${appSettings.grayscaleProviderLogos ? "grayscale" : ""}`}
+                                        >
+                                          <ProviderIcon className="size-3" />
+                                        </span>
+                                      }
+                                    />
+                                    <TooltipPopup side="top">{provider}</TooltipPopup>
+                                  </Tooltip>
                                 </div>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
