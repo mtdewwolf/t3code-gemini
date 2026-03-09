@@ -46,6 +46,7 @@ import {
 } from "./copilotTurnTracking.ts";
 import { normalizeCopilotCliPathOverride, resolveBundledCopilotCliPath } from "./copilotCliPath.ts";
 import { CopilotAdapter, type CopilotAdapterShape } from "../Services/CopilotAdapter.ts";
+import { toMessage } from "../toMessage.ts";
 import type {
   ProviderThreadSnapshot,
   ProviderThreadTurnSnapshot,
@@ -126,12 +127,6 @@ interface CopilotClientHandle {
   stop(): Promise<Error[]>;
 }
 
-function toMessage(cause: unknown, fallback: string): string {
-  if (cause instanceof Error && cause.message.length > 0) {
-    return cause.message;
-  }
-  return fallback;
-}
 
 function makeEventId(prefix: string) {
   return EventId.makeUnsafe(`${prefix}-${randomUUID()}`);
@@ -1076,8 +1071,11 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
       if (event.type === "session.model_change") {
         record.model = event.data.newModel;
       }
-      if (event.type === "tool.execution_start" && trimToUndefined(event.data.toolName)) {
-        record.toolTitlesByCallId.set(event.data.toolCallId, trimToUndefined(event.data.toolName)!);
+      if (event.type === "tool.execution_start") {
+        const toolName = trimToUndefined(event.data.toolName);
+        if (toolName) {
+          record.toolTitlesByCallId.set(event.data.toolCallId, toolName);
+        }
       }
 
       void writeNativeEvent(record.threadId, event);

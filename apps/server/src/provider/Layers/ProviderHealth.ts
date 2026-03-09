@@ -488,7 +488,7 @@ export const checkCopilotProviderStatus: Effect.Effect<ServerProviderStatus, nev
           quotaSnapshots: Record<string, CopilotQuotaSnapshotInfo> | undefined;
         };
       } finally {
-        await client.stop().catch(() => []);
+        await client.stop().catch(() => undefined);
       }
     },
     catch: (cause): CopilotHealthProbeError => ({ _tag: "CopilotHealthProbeError", cause }),

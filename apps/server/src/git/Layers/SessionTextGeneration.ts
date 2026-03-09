@@ -225,6 +225,13 @@ const makeSessionTextGeneration = Effect.gen(function* () {
             });
           }
 
+          if (event.type === "session.exited") {
+            return yield* new TextGenerationError({
+              operation,
+              detail: `${resolvedProvider} provider session exited unexpectedly during text generation.`,
+            });
+          }
+
           if (event.type === "turn.completed") {
             if (event.payload.state !== "completed") {
               return yield* new TextGenerationError({

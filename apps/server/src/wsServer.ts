@@ -53,6 +53,7 @@ import { GitManager } from "./git/Services/GitManager.ts";
 import { TerminalManager } from "./terminal/Services/Manager.ts";
 import { Keybindings } from "./keybindings";
 import { searchWorkspaceEntries } from "./workspaceEntries";
+import { redactEventForBoundary } from "./orchestration/redactEvent.ts";
 import { OrchestrationEngineService } from "./orchestration/Services/OrchestrationEngine";
 import { ProjectionSnapshotQuery } from "./orchestration/Services/ProjectionSnapshotQuery";
 import { OrchestrationReactor } from "./orchestration/Services/OrchestrationReactor";
@@ -634,7 +635,7 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
     broadcastPush({
       type: "push",
       channel: ORCHESTRATION_WS_CHANNELS.domainEvent,
-      data: event,
+      data: redactEventForBoundary(event),
     }),
   ).pipe(Effect.forkIn(subscriptionsScope));
 

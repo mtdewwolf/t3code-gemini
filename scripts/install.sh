@@ -131,7 +131,7 @@ detect_os() {
   case "$OS_RAW" in
     Darwin*)          OS="macos"   ;;
     Linux*)           OS="linux"   ;;
-    CYGWIN*|MSYS*|MINGW*|MINGW64*) OS="windows" ;;
+    CYGWIN*|MSYS*|MINGW*) OS="windows" ;;
     *)                OS="unknown" ;;
   esac
 
@@ -271,7 +271,6 @@ check_node() {
   fi
 
   log_ok "Node.js found: ${BOLD}${node_bin}${RESET} (${node_ver})"
-  NODE_BIN="$node_bin"
   return 0
 }
 
@@ -402,7 +401,7 @@ check_prerequisites() {
 
   local failed=false
 
-  GIT_BIN="" NODE_BIN="" BUN_BIN=""
+  GIT_BIN="" BUN_BIN=""
 
   check_git  || failed=true
   check_node || failed=true

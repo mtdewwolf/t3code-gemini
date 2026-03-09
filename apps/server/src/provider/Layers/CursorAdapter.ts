@@ -45,6 +45,7 @@ import {
   CursorAcpSessionUpdateNotification,
 } from "../Services/CursorAdapter.ts";
 import { type EventNdjsonLogger, makeEventNdjsonLogger } from "./EventNdjsonLogger.ts";
+import { toMessage } from "../toMessage.ts";
 
 const PROVIDER = "cursor" as const;
 const DEFAULT_REQUEST_TIMEOUT_MS = 120_000;
@@ -239,12 +240,6 @@ export interface CursorAdapterLiveOptions {
   readonly nativeEventLogger?: EventNdjsonLogger;
 }
 
-function toMessage(cause: unknown, fallback: string): string {
-  if (cause instanceof Error && cause.message.length > 0) {
-    return cause.message;
-  }
-  return fallback;
-}
 
 function asRuntimeItemId(value: string): RuntimeItemId {
   return RuntimeItemId.makeUnsafe(value);
@@ -339,6 +334,10 @@ function extractCursorChunkText(update: unknown): string {
   const fragments: string[] = [];
   appendChunkText(fragments, updateRecord.text);
   appendChunkText(fragments, updateRecord.delta);
+
+  if (fragments.length > 0) {
+    return fragments.join("");
+  }
 
   const content = updateRecord.content;
   if (typeof content === "string") {

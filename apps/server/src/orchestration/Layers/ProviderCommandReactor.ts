@@ -697,7 +697,12 @@ const make = Effect.gen(function* () {
     Effect.gen(function* () {
       switch (event.type) {
         case "thread.deleted": {
-          threadProviderOptions.delete(event.payload.threadId);
+          const threadId = event.payload.threadId;
+          // Best-effort stop — thread is being deleted, ignore failures
+          yield* providerService
+            .stopSession({ threadId })
+            .pipe(Effect.catchCause(() => Effect.void));
+          threadProviderOptions.delete(threadId);
           return;
         }
         case "thread.runtime-mode-set": {

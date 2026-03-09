@@ -38,6 +38,7 @@ import {
 import { resolveAttachmentPath } from "../../attachmentStore.ts";
 import { ServerConfig } from "../../config.ts";
 import { type EventNdjsonLogger, makeEventNdjsonLogger } from "./EventNdjsonLogger.ts";
+import { toMessage } from "../toMessage.ts";
 
 const PROVIDER = "codex" as const;
 
@@ -49,13 +50,6 @@ export interface CodexAdapterLiveOptions {
   readonly makeManager?: (services?: ServiceMap.ServiceMap<never>) => CodexAppServerManager;
   readonly nativeEventLogPath?: string;
   readonly nativeEventLogger?: EventNdjsonLogger;
-}
-
-function toMessage(cause: unknown, fallback: string): string {
-  if (cause instanceof Error && cause.message.length > 0) {
-    return cause.message;
-  }
-  return fallback;
 }
 
 function toSessionError(

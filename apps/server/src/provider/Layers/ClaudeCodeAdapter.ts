@@ -51,6 +51,7 @@ import {
 } from "../Errors.ts";
 import { ClaudeCodeAdapter, type ClaudeCodeAdapterShape } from "../Services/ClaudeCodeAdapter.ts";
 import { type EventNdjsonLogger, makeEventNdjsonLogger } from "./EventNdjsonLogger.ts";
+import { toMessage } from "../toMessage.ts";
 
 const PROVIDER = "claudeCode" as const;
 
@@ -244,12 +245,6 @@ function isSyntheticClaudeThreadId(value: string): boolean {
   return value.startsWith("claude-thread-");
 }
 
-function toMessage(cause: unknown, fallback: string): string {
-  if (cause instanceof Error && cause.message.length > 0) {
-    return cause.message;
-  }
-  return fallback;
-}
 
 function toStringOrUndefined(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;

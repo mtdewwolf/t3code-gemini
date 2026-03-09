@@ -20,12 +20,14 @@ import {
   ProviderStopSessionInput,
   type ProviderRuntimeEvent,
   type ProviderSession,
+  type ProviderStartOptions,
 } from "@t3tools/contracts";
 import { Effect, Layer, Option, PubSub, Queue, Schema, SchemaIssue, Stream } from "effect";
 
 import { ProviderValidationError } from "../Errors.ts";
 import { ProviderAdapterRegistry } from "../Services/ProviderAdapterRegistry.ts";
 import { ProviderService, type ProviderServiceShape } from "../Services/ProviderService.ts";
+import { redactProviderStartOptions } from "../../orchestration/redactEvent.ts";
 import {
   ProviderSessionDirectory,
   type ProviderRuntimeBinding,
@@ -86,16 +88,27 @@ function toRuntimeStatus(session: ProviderSession): "starting" | "running" | "st
   }
 }
 
+function redactProviderOptions(
+  providerOptions: unknown,
+): unknown {
+  if (!providerOptions || typeof providerOptions !== "object" || Array.isArray(providerOptions)) {
+    return providerOptions;
+  }
+  return redactProviderStartOptions(providerOptions as ProviderStartOptions);
+}
+
 function toRuntimePayloadFromSession(
   session: ProviderSession,
   extra?: { readonly providerOptions?: unknown },
 ): Record<string, unknown> {
+  const safeProviderOptions =
+    extra?.providerOptions !== undefined ? redactProviderOptions(extra.providerOptions) : undefined;
   return {
     cwd: session.cwd ?? null,
     model: session.model ?? null,
     activeTurnId: session.activeTurnId ?? null,
     lastError: session.lastError ?? null,
-    ...(extra?.providerOptions !== undefined ? { providerOptions: extra.providerOptions } : {}),
+    ...(safeProviderOptions !== undefined ? { providerOptions: safeProviderOptions } : {}),
   };
 }
 
@@ -344,6 +357,10 @@ const makeProviderService = (options?: ProviderServiceLiveOptions) =>
         const sendTurnProviderOptions = readPersistedProviderOptions(
           Option.getOrUndefined(sendTurnBinding)?.runtimePayload,
         );
+        const safeSendTurnProviderOptions =
+          sendTurnProviderOptions !== undefined
+            ? redactProviderOptions(sendTurnProviderOptions)
+            : undefined;
         yield* directory.upsert({
           threadId: input.threadId,
           provider: routed.adapter.provider,
@@ -353,7 +370,7 @@ const makeProviderService = (options?: ProviderServiceLiveOptions) =>
             activeTurnId: turn.turnId,
             lastRuntimeEvent: "provider.sendTurn",
             lastRuntimeEventAt: new Date().toISOString(),
-            ...(sendTurnProviderOptions !== undefined ? { providerOptions: sendTurnProviderOptions } : {}),
+            ...(safeSendTurnProviderOptions !== undefined ? { providerOptions: safeSendTurnProviderOptions } : {}),
           },
         });
         yield* analytics.record("provider.turn.sent", {
@@ -521,6 +538,10 @@ const makeProviderService = (options?: ProviderServiceLiveOptions) =>
               const binding = Option.getOrUndefined(bindingOption);
               if (!binding) return Effect.void;
               const existingProviderOptions = readPersistedProviderOptions(binding.runtimePayload);
+              const safeExistingProviderOptions =
+                existingProviderOptions !== undefined
+                  ? redactProviderOptions(existingProviderOptions)
+                  : undefined;
               return directory.upsert({
                 threadId,
                 provider: binding.provider,
@@ -529,7 +550,7 @@ const makeProviderService = (options?: ProviderServiceLiveOptions) =>
                   activeTurnId: null,
                   lastRuntimeEvent: "provider.stopAll",
                   lastRuntimeEventAt: new Date().toISOString(),
-                  ...(existingProviderOptions !== undefined ? { providerOptions: existingProviderOptions } : {}),
+                  ...(safeExistingProviderOptions !== undefined ? { providerOptions: safeExistingProviderOptions } : {}),
                 },
               });
             }),

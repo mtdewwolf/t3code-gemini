@@ -1,6 +1,5 @@
 import {
   type ApprovalRequestId,
-  CLAUDE_CODE_EFFORT_OPTIONS,
   type ClaudeCodeEffort,
   DEFAULT_MODEL_BY_PROVIDER,
   CURSOR_REASONING_OPTIONS,
@@ -18,8 +17,6 @@ import {
   PROVIDER_SEND_TURN_MAX_IMAGE_BYTES,
   type ResolvedKeybindingsConfig,
   type ProviderApprovalDecision,
-  type ServerProviderModel,
-  type ServerProviderQuotaSnapshot,
   type ServerProviderStatus,
   type ProviderKind,
   type ThreadId,
@@ -33,7 +30,6 @@ import {
   getDefaultClaudeCodeEffort,
   getDefaultModel,
   getDefaultReasoningEffort,
-  getModelOptions,
   getCursorModelCapabilities,
   getCursorModelFamilyOptions,
   getReasoningEffortOptions,
@@ -87,10 +83,8 @@ import {
   findLatestProposedPlan,
   type PendingApproval,
   type PendingUserInput,
-  type ProviderPickerKind,
   PROVIDER_OPTIONS,
   deriveWorkLogEntries,
-  hasToolActivityForTurn,
   hasToolActivitySince,
   isLatestTurnSettled,
   formatElapsed,
@@ -2631,10 +2625,6 @@ export default function ChatView({ threadId }: ChatViewProps) {
       return;
     }
     event.preventDefault();
-    const nextTarget = event.relatedTarget;
-    if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
-      return;
-    }
     dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
     if (dragDepthRef.current === 0) {
       setIsDragOverComposer(false);
@@ -3288,6 +3278,8 @@ export default function ChatView({ threadId }: ChatViewProps) {
       resetSendPhase();
     };
 
+    let serverStarted = false;
+
     await api.orchestration
       .dispatchCommand({
         type: "thread.create",
@@ -3325,7 +3317,10 @@ export default function ChatView({ threadId }: ChatViewProps) {
           createdAt,
         }),
       )
-      .then(() => api.orchestration.getSnapshot())
+      .then(() => {
+        serverStarted = true;
+        return api.orchestration.getSnapshot();
+      })
       .then((snapshot) => {
         // Snapshot sync is a safety net for the navigation/thread creation
         // flow: the newly created thread must exist in the client-side read
@@ -3342,21 +3337,23 @@ export default function ChatView({ threadId }: ChatViewProps) {
         });
       })
       .catch(async (err) => {
-        await api.orchestration
-          .dispatchCommand({
-            type: "thread.delete",
-            commandId: newCommandId(),
-            threadId: nextThreadId,
-          })
-          .catch(() => undefined);
-        // Re-sync after rollback so the deleted thread is removed from
-        // the client read model even if the WebSocket push is delayed.
-        await api.orchestration
-          .getSnapshot()
-          .then((snapshot) => {
-            syncServerReadModel(snapshot);
-          })
-          .catch(() => undefined);
+        if (!serverStarted) {
+          await api.orchestration
+            .dispatchCommand({
+              type: "thread.delete",
+              commandId: newCommandId(),
+              threadId: nextThreadId,
+            })
+            .catch(() => undefined);
+          // Re-sync after rollback so the deleted thread is removed from
+          // the client read model even if the WebSocket push is delayed.
+          await api.orchestration
+            .getSnapshot()
+            .then((snapshot) => {
+              syncServerReadModel(snapshot);
+            })
+            .catch(() => undefined);
+        }
         toastManager.add({
           type: "error",
           title: "Could not start implementation thread",
@@ -6690,15 +6687,18 @@ const OpenInPicker = memo(function OpenInPicker({
 
   const copyPath = useCallback(() => {
     if (!openInCwd) return;
-    void navigator.clipboard.writeText(openInCwd);
-    setCopiedPath(true);
-    if (copiedPathTimeoutRef.current !== null) {
-      clearTimeout(copiedPathTimeoutRef.current);
-    }
-    copiedPathTimeoutRef.current = setTimeout(() => {
-      setCopiedPath(false);
-      copiedPathTimeoutRef.current = null;
-    }, 2000);
+    void navigator.clipboard.writeText(openInCwd).then(() => {
+      setCopiedPath(true);
+      if (copiedPathTimeoutRef.current !== null) {
+        clearTimeout(copiedPathTimeoutRef.current);
+      }
+      copiedPathTimeoutRef.current = setTimeout(() => {
+        setCopiedPath(false);
+        copiedPathTimeoutRef.current = null;
+      }, 2000);
+    }).catch(() => {
+      // Clipboard write failed — don't show success indicator.
+    });
   }, [openInCwd]);
 
   const openFavoriteEditorShortcutLabel = useMemo(
