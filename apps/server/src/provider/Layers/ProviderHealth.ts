@@ -17,7 +17,7 @@ import type {
   ServerProviderStatusState,
 } from "@t3tools/contracts";
 import { CopilotClient, type ModelInfo } from "@github/copilot-sdk";
-import { Effect, Fiber, FileSystem, Layer, Option, Path, Result, Stream } from "effect";
+import { Effect, Fiber, FileSystem, Layer, Option, Path, PlatformError, Result, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import { resolveBundledCopilotCliPath, withSanitizedCopilotDesktopEnv } from "./copilotCliPath.ts";
@@ -204,7 +204,16 @@ export const readCodexConfigModelProvider = Effect.gen(function* () {
 
   const content = yield* fileSystem
     .readFileString(configPath)
-    .pipe(Effect.orElseSucceed(() => undefined));
+    .pipe(
+      Effect.catchTag("PlatformError", (e) =>
+        e.reason instanceof PlatformError.SystemError && e.reason._tag === "NotFound"
+          ? Effect.succeed(undefined)
+          : Effect.gen(function* () {
+              yield* Effect.logWarning(`Failed to read Codex config at ${configPath}: ${e.message}`);
+              return undefined;
+            }),
+      ),
+    );
   if (content === undefined) {
     return undefined;
   }
@@ -342,11 +351,12 @@ export const checkCodexProviderStatus: Effect.Effect<
   if (yield* hasCustomModelProvider) {
     return {
       provider: CODEX_PROVIDER,
-      status: "ready" as const,
+      status: "warning" as const,
       available: true,
       authStatus: "unknown" as const,
       checkedAt,
-      message: "Using a custom Codex model provider; OpenAI login check skipped.",
+      message:
+        "Using a custom Codex model provider; OpenAI login check skipped. External provider credentials were not verified.",
     } satisfies ServerProviderStatus;
   }
 
