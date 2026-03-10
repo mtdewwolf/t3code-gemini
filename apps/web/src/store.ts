@@ -383,7 +383,9 @@ function normalizeActivity(
   const normalized = { ...activity };
   if (
     existing &&
+    existing.id === normalized.id &&
     existing.kind === normalized.kind &&
+    existing.tone === normalized.tone &&
     existing.summary === normalized.summary &&
     existing.turnId === normalized.turnId &&
     existing.createdAt === normalized.createdAt &&

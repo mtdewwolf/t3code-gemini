@@ -788,7 +788,7 @@ export const makeGitManager = Effect.gen(function* () {
         yield* ensureExistingWorktreeUpstream(existingBranchBeforeFetch.worktreePath);
         return {
           pullRequest,
-          branch: localPullRequestBranch,
+          branch: existingBranchBeforeFetch.name,
           worktreePath: existingBranchBeforeFetch.worktreePath,
         };
       }
@@ -796,6 +796,12 @@ export const makeGitManager = Effect.gen(function* () {
         return yield* gitManagerError(
           "preparePullRequestThread",
           "This PR branch is already checked out in the main repo. Use Local, or switch the main repo off that branch before creating a worktree thread.",
+        );
+      }
+      if (existingBranchBeforeFetch && !existingBranchBeforeFetch.worktreePath) {
+        return yield* gitManagerError(
+          "preparePullRequestThread",
+          "A local branch with this name already exists. Delete it or check it out in a worktree before creating a PR thread.",
         );
       }
 
@@ -816,7 +822,7 @@ export const makeGitManager = Effect.gen(function* () {
         yield* ensureExistingWorktreeUpstream(existingBranchAfterFetch.worktreePath);
         return {
           pullRequest,
-          branch: localPullRequestBranch,
+          branch: existingBranchAfterFetch.name,
           worktreePath: existingBranchAfterFetch.worktreePath,
         };
       }

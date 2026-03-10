@@ -154,7 +154,13 @@ const makeProviderService = (options?: ProviderServiceLiveOptions) =>
     const publishRuntimeEvent = (event: ProviderRuntimeEvent): Effect.Effect<void> =>
       Effect.succeed(event).pipe(
         Effect.tap((canonicalEvent) =>
-          canonicalEventLogger ? canonicalEventLogger.write(canonicalEvent, null) : Effect.void,
+          canonicalEventLogger
+            ? canonicalEventLogger.write(canonicalEvent, null).pipe(
+                Effect.catchCause((cause) =>
+                  Effect.logWarning("failed to write canonical provider event", { cause }),
+                ),
+              )
+            : Effect.void,
         ),
         Effect.flatMap((canonicalEvent) => PubSub.publish(runtimeEventPubSub, canonicalEvent)),
         Effect.asVoid,
@@ -473,7 +479,11 @@ const makeProviderService = (options?: ProviderServiceLiveOptions) =>
               { concurrency: "unbounded" },
             ),
           ),
-          Effect.orElseSucceed(() => [] as Array<Option.Option<ProviderRuntimeBinding>>),
+          Effect.catchCause((cause) => {
+            return Effect.logWarning("failed to list persisted thread bindings", { cause }).pipe(
+              Effect.map(() => [] as Array<Option.Option<ProviderRuntimeBinding>>),
+            );
+          }),
         );
         const bindingsByThreadId = new Map<ThreadId, ProviderRuntimeBinding>();
         for (const bindingOption of persistedBindings) {

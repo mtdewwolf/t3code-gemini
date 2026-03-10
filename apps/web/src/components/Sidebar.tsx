@@ -1087,7 +1087,10 @@ export default function Sidebar() {
   const deleteThread = useCallback(
     async (
       threadId: ThreadId,
-      opts: { deletedThreadIds?: ReadonlySet<ThreadId> } = {},
+      opts: {
+        deletedThreadIds?: ReadonlySet<ThreadId>;
+        processedWorktreePaths?: Set<string>;
+      } = {},
     ): Promise<void> => {
       const api = readNativeApi();
       if (!api) return;
@@ -1103,11 +1106,18 @@ export default function Sidebar() {
         deletedIds && deletedIds.size > 0
           ? threads.filter((t) => t.id === threadId || !deletedIds.has(t.id))
           : threads;
+      const processedWorktrees = opts.processedWorktreePaths;
       const orphanedWorktreePath = getOrphanedWorktreePathForThread(survivingThreads, threadId);
       const displayWorktreePath = orphanedWorktreePath
         ? formatWorktreePathForDisplay(orphanedWorktreePath)
         : null;
-      const canDeleteWorktree = orphanedWorktreePath !== null && threadProject !== undefined;
+      const alreadyProcessed =
+        orphanedWorktreePath !== null && processedWorktrees?.has(orphanedWorktreePath) === true;
+      if (orphanedWorktreePath !== null && processedWorktrees) {
+        processedWorktrees.add(orphanedWorktreePath);
+      }
+      const canDeleteWorktree =
+        orphanedWorktreePath !== null && threadProject !== undefined && !alreadyProcessed;
       const shouldDeleteWorktree =
         canDeleteWorktree &&
         (await api.dialogs.confirm(
@@ -1295,8 +1305,9 @@ export default function Sidebar() {
       }
 
       const deletedIds = new Set<ThreadId>(ids);
+      const processedWorktreePaths = new Set<string>();
       for (const id of ids) {
-        await deleteThread(id, { deletedThreadIds: deletedIds });
+        await deleteThread(id, { deletedThreadIds: deletedIds, processedWorktreePaths });
       }
       removeFromSelection(ids);
     },
@@ -1940,7 +1951,7 @@ export default function Sidebar() {
                     hasHiddenThreads && !isThreadListExpanded
                       ? filteredProjectThreads.slice(0, THREAD_PREVIEW_LIMIT)
                       : filteredProjectThreads;
-                  const orderedProjectThreadIds = projectThreads.map((t) => t.id);
+                  const orderedProjectThreadIds = visibleThreads.map((t) => t.id);
 
                   return (
                     <SortableProjectItem key={project.id} projectId={project.id}>

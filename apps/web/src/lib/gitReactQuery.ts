@@ -62,16 +62,18 @@ export function gitResolvePullRequestQueryOptions(input: {
   cwd: string | null;
   reference: string | null;
 }) {
+  const hasCwd = input.cwd != null && input.cwd.trim().length > 0;
+  const hasReference = input.reference != null && input.reference.trim().length > 0;
   return queryOptions({
     queryKey: ["git", "pull-request", input.cwd, input.reference] as const,
     queryFn: async () => {
       const api = ensureNativeApi();
-      if (!input.cwd || !input.reference) {
+      if (!hasCwd || !hasReference) {
         throw new Error("Pull request lookup is unavailable.");
       }
-      return api.git.resolvePullRequest({ cwd: input.cwd, reference: input.reference });
+      return api.git.resolvePullRequest({ cwd: input.cwd!, reference: input.reference! });
     },
-    enabled: input.cwd !== null && input.reference !== null,
+    enabled: hasCwd && hasReference,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -204,7 +206,8 @@ export function gitPreparePullRequestThreadMutationOptions(input: {
   return mutationOptions({
     mutationFn: async ({ reference, mode }: { reference: string; mode: "local" | "worktree" }) => {
       const api = ensureNativeApi();
-      if (!input.cwd) throw new Error("Pull request thread preparation is unavailable.");
+      if (!input.cwd || reference.trim().length === 0)
+        throw new Error("Pull request thread preparation is unavailable.");
       return api.git.preparePullRequestThread({
         cwd: input.cwd,
         reference,

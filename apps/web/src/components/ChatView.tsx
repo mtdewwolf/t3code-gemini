@@ -3858,6 +3858,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
       }
       promptRef.current = nextPrompt;
       promptSyncPendingRef.current = true;
+      setPromptState((current) => (current === nextPrompt ? current : nextPrompt));
       composerCursorRef.current = nextCursor;
       setHasPromptText((current) => {
         const next = nextPrompt.trim().length > 0;
@@ -4289,21 +4290,44 @@ export default function ChatView({ threadId }: ChatViewProps) {
                       />
 
                       {isComposerFooterCompact ? (
-                        <CompactComposerControlsMenu
-                          activePlan={Boolean(activePlan || activeProposedPlan || planSidebarOpen)}
-                          interactionMode={interactionMode}
-                          planSidebarOpen={planSidebarOpen}
-                          runtimeMode={runtimeMode}
-                          selectedEffort={selectedEffort}
-                          selectedProvider={selectedProvider}
-                          selectedCodexFastModeEnabled={selectedCodexFastModeEnabled}
-                          reasoningOptions={reasoningOptions}
-                          onEffortSelect={onEffortSelect}
-                          onCodexFastModeChange={onCodexFastModeChange}
-                          onToggleInteractionMode={toggleInteractionMode}
-                          onTogglePlanSidebar={togglePlanSidebar}
-                          onToggleRuntimeMode={toggleRuntimeMode}
-                        />
+                        <>
+                          {selectedProvider === "cursor" &&
+                            hasSelectedCursorTraits &&
+                            selectedCursorModel &&
+                            selectedCursorModelCapabilities && (
+                              <CursorTraitsPicker
+                                selection={selectedCursorModel}
+                                capabilities={selectedCursorModelCapabilities}
+                                onReasoningChange={onCursorReasoningSelect}
+                                onFastModeChange={onCursorFastModeChange}
+                                onThinkingModeChange={onCursorThinkingModeChange}
+                              />
+                            )}
+                          {selectedProvider === "claudeCode" &&
+                            supportsClaudeCodeEffort &&
+                            selectedClaudeCodeEffort != null && (
+                              <ClaudeCodeTraitsPicker
+                                effort={selectedClaudeCodeEffort}
+                                options={claudeCodeEffortOptions}
+                                onEffortChange={onClaudeCodeEffortSelect}
+                              />
+                            )}
+                          <CompactComposerControlsMenu
+                            activePlan={Boolean(activePlan || activeProposedPlan || planSidebarOpen)}
+                            interactionMode={interactionMode}
+                            planSidebarOpen={planSidebarOpen}
+                            runtimeMode={runtimeMode}
+                            selectedEffort={selectedEffort}
+                            selectedProvider={selectedProvider}
+                            selectedCodexFastModeEnabled={selectedCodexFastModeEnabled}
+                            reasoningOptions={reasoningOptions}
+                            onEffortSelect={onEffortSelect}
+                            onCodexFastModeChange={onCodexFastModeChange}
+                            onToggleInteractionMode={toggleInteractionMode}
+                            onTogglePlanSidebar={togglePlanSidebar}
+                            onToggleRuntimeMode={toggleRuntimeMode}
+                          />
+                        </>
                       ) : (
                         <>
                           {selectedProvider === "cursor" ? (
