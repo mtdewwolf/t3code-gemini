@@ -544,7 +544,7 @@ const makeKeybindings = Effect.gen(function* () {
   const resolvedConfigCacheKey = "resolved" as const;
   const changesPubSub = yield* PubSub.unbounded<KeybindingsChangeEvent>();
   const startedRef = yield* Ref.make(false);
-  const startedDeferred = yield* Deferred.make<void, KeybindingsConfigError>();
+  let startedDeferred = yield* Deferred.make<void, KeybindingsConfigError>();
   const watcherScope = yield* Scope.make("sequential");
   yield* Effect.addFinalizer(() => Scope.close(watcherScope, Exit.void));
   const emitChange = (configState: KeybindingsConfigState) =>
@@ -852,7 +852,12 @@ const makeKeybindings = Effect.gen(function* () {
 
     const startupExit = yield* Effect.exit(startup);
     if (startupExit._tag === "Failure") {
+      // Reset the gate so subsequent callers can retry
+      yield* Ref.set(startedRef, false);
       yield* Deferred.failCause(startedDeferred, startupExit.cause).pipe(Effect.orDie);
+      // Replace the deferred so new callers get a fresh one
+      const nextDeferred = yield* Deferred.make<void, KeybindingsConfigError>();
+      startedDeferred = nextDeferred;
       return yield* Effect.failCause(startupExit.cause);
     }
 

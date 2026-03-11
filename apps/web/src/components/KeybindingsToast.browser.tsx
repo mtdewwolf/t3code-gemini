@@ -342,6 +342,7 @@ describe("Keybindings update toast", () => {
 
   it("does not show a toast from the replayed cached value on subscribe", async () => {
     const mounted = await mountApp();
+    let remounted: Awaited<ReturnType<typeof mountApp>> | undefined;
 
     try {
       sendServerConfigUpdatedPush([]);
@@ -351,7 +352,7 @@ describe("Keybindings update toast", () => {
       // Remount the app — onServerConfigUpdated replays the cached value
       // synchronously on subscribe. This should NOT produce a toast.
       await mounted.cleanup();
-      const remounted = await mountApp();
+      remounted = await mountApp();
 
       // Give it a moment to process the replayed value
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -364,7 +365,12 @@ describe("Keybindings update toast", () => {
 
       await remounted.cleanup();
     } catch (error) {
-      await mounted.cleanup().catch(() => {});
+      // Clean up whichever mount instance is active
+      if (remounted) {
+        await remounted.cleanup().catch(() => {});
+      } else {
+        await mounted.cleanup().catch(() => {});
+      }
       throw error;
     }
   });

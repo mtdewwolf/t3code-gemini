@@ -45,17 +45,25 @@ export const makeDrainableWorker = <A, E, R>(
     const state = yield* Ref.make({
       outstanding: 0,
       idle: initialIdle,
+      closed: false,
     });
 
-    yield* Effect.addFinalizer(() => Queue.shutdown(queue).pipe(Effect.asVoid));
+    yield* Effect.addFinalizer(() =>
+      Ref.modify(state, (current) => {
+        return [current.idle, { ...current, closed: true }] as const;
+      }).pipe(
+        Effect.flatMap((idle) => Deferred.succeed(idle, undefined).pipe(Effect.orDie)),
+        Effect.andThen(Queue.shutdown(queue).pipe(Effect.asVoid)),
+      ),
+    );
 
     const finishOne = Ref.modify(state, (current) => {
       const remaining = Math.max(0, current.outstanding - 1);
       return [
         remaining === 0 ? current.idle : null,
         {
+          ...current,
           outstanding: remaining,
-          idle: current.idle,
         },
       ] as const;
     }).pipe(
@@ -81,16 +89,22 @@ export const makeDrainableWorker = <A, E, R>(
 
     const enqueue: DrainableWorker<A>["enqueue"] = (item) =>
       Effect.gen(function* () {
+        const { closed } = yield* Ref.get(state);
+        if (closed) {
+          return;
+        }
+
         const nextIdle = yield* Deferred.make<void>();
         yield* Ref.update(state, (current) =>
           current.outstanding === 0
             ? {
+                ...current,
                 outstanding: 1,
                 idle: nextIdle,
               }
             : {
+                ...current,
                 outstanding: current.outstanding + 1,
-                idle: current.idle,
               },
         );
 
@@ -101,7 +115,9 @@ export const makeDrainableWorker = <A, E, R>(
       });
 
     const drain: DrainableWorker<A>["drain"] = Ref.get(state).pipe(
-      Effect.flatMap(({ idle }) => Deferred.await(idle)),
+      Effect.flatMap(({ idle, closed }) =>
+        closed ? Effect.void : Deferred.await(idle),
+      ),
     );
 
     return { enqueue, drain } satisfies DrainableWorker<A>;
