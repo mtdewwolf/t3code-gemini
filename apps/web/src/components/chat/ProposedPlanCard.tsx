@@ -54,20 +54,16 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
     downloadPlanAsTextFile(downloadFilename, saveContents);
   };
 
+  const canSaveToWorkspace = () => Boolean(workspaceRoot && readNativeApi());
+
   const openSaveDialog = () => {
-    if (!workspaceRoot) {
+    if (!canSaveToWorkspace()) {
       toastManager.add({
         type: "error",
-        title: "Workspace path is unavailable",
-        description: "This thread does not have a workspace path to save into.",
-      });
-      return;
-    }
-    if (!readNativeApi()) {
-      toastManager.add({
-        type: "error",
-        title: "Native API unavailable",
-        description: "Saving to workspace requires the native desktop app.",
+        title: !workspaceRoot ? "Workspace path is unavailable" : "Native API unavailable",
+        description: !workspaceRoot
+          ? "This thread does not have a workspace path to save into."
+          : "Saving to workspace requires the native desktop app.",
       });
       return;
     }
@@ -85,6 +81,14 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
       toastManager.add({
         type: "warning",
         title: "Enter a workspace path",
+      });
+      return;
+    }
+    if (relativePath.startsWith("/") || relativePath.includes("..")) {
+      toastManager.add({
+        type: "warning",
+        title: "Invalid path",
+        description: "Path must be relative and cannot contain '..' segments.",
       });
       return;
     }
@@ -131,7 +135,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
           </MenuTrigger>
           <MenuPopup align="end">
             <MenuItem onClick={handleDownload}>Download as markdown</MenuItem>
-            <MenuItem onClick={openSaveDialog} disabled={!workspaceRoot || isSavingToWorkspace}>
+            <MenuItem onClick={openSaveDialog} disabled={!canSaveToWorkspace() || isSavingToWorkspace}>
               Save to workspace
             </MenuItem>
           </MenuPopup>
