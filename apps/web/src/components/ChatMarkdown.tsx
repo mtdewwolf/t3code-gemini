@@ -1,8 +1,4 @@
-import {
-  getSharedHighlighter,
-  type DiffsHighlighter,
-  type SupportedLanguages,
-} from "@pierre/diffs";
+import { DiffsHighlighter, getSharedHighlighter, SupportedLanguages } from "@pierre/diffs";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import React, {
   Children,
@@ -20,13 +16,13 @@ import React, {
 import type { Components } from "react-markdown";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { openInPreferredEditor } from "../editorPreferences";
 import { resolveDiffThemeName, type DiffThemeName } from "../lib/diffRendering";
 import { fnv1a32 } from "../lib/diffRendering";
 import { LRUCache } from "../lib/lruCache";
 import { useTheme } from "../hooks/useTheme";
 import { resolveMarkdownFileLinkTarget } from "../markdown-links";
 import { readNativeApi } from "../nativeApi";
-import { preferredTerminalEditor } from "../terminal-links";
 
 class CodeHighlightErrorBoundary extends React.Component<
   { fallback: ReactNode; children: ReactNode },
@@ -213,7 +209,12 @@ function SuspenseShikiCodeBlock({
   const highlightedHtml = useMemo(() => {
     try {
       return highlighter.codeToHtml(code, { lang: language, theme: themeName });
-    } catch {
+    } catch (error) {
+      // Log highlighting failures for debugging while falling back to plain text
+      console.warn(
+        `Code highlighting failed for language "${language}", falling back to plain text.`,
+        error instanceof Error ? error.message : error,
+      );
       // If highlighting fails for this language, render as plain text
       return highlighter.codeToHtml(code, { lang: "text", theme: themeName });
     }
@@ -254,12 +255,68 @@ function ChatMarkdown({ text, cwd, isStreaming = false }: ChatMarkdownProps) {
               event.stopPropagation();
               const api = readNativeApi();
               if (api) {
-                void api.shell.openInEditor(targetPath, preferredTerminalEditor());
+                openInPreferredEditor(api, targetPath).catch((error) => {
+                  console.warn("Unable to open file in preferred editor.", error);
+                });
               } else {
                 console.warn("Native API not found. Unable to open file in editor.");
               }
             }}
           />
+        );
+      },
+      code({ node: _node, className, children, ...props }) {
+        // Only transform inline code (fenced code blocks have language classes
+        // and are handled by the `pre` override).
+        if (className) {
+          return (
+            <code className={className} {...props}>
+              {children}
+            </code>
+          );
+        }
+
+        const text = typeof children === "string" ? children : nodeToPlainText(children);
+        const targetPath = resolveMarkdownFileLinkTarget(text.trim(), cwd);
+
+        if (!targetPath) {
+          return <code {...props}>{children}</code>;
+        }
+
+        // Strip :line:col suffix — OS default apps don't understand them.
+        const pathForOpen = targetPath.replace(/:\d+(?::\d+)?$/, "");
+
+        return (
+          <code
+            {...props}
+            className="cursor-pointer underline decoration-dotted underline-offset-2 hover:text-foreground"
+            role="button"
+            tabIndex={0}
+            title={`Open ${text.trim()}`}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              const api = readNativeApi();
+              if (api) {
+                api.shell.openInEditor(pathForOpen, "file-manager").catch((error) => {
+                  console.warn("Unable to open in file manager.", error);
+                });
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                const api = readNativeApi();
+                if (api) {
+                  api.shell.openInEditor(pathForOpen, "file-manager").catch((error) => {
+                    console.warn("Unable to open in file manager.", error);
+                  });
+                }
+              }
+            }}
+          >
+            {children}
+          </code>
         );
       },
       pre({ node: _node, children, ...props }) {
