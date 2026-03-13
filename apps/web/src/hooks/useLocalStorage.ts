@@ -97,9 +97,15 @@ export function useLocalStorage<T, E>(
   // Use a flag to prevent self-triggered local-change events from causing a feedback loop.
   const isInitialMount = useRef(true);
   const isSelfDispatch = useRef(false);
+  const prevKeyRef = useRef(key);
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
+      return;
+    }
+    // Skip persistence during key transitions — the key-sync effect below
+    // will establish the correct storedValue for the new key first.
+    if (prevKeyRef.current !== key) {
       return;
     }
     try {
@@ -114,8 +120,6 @@ export function useLocalStorage<T, E>(
       console.error("[LOCALSTORAGE] Error:", error);
     }
   }, [storedValue, key, schema]);
-
-  const prevKeyRef = useRef(key);
 
   // Re-sync from localStorage when key changes
   useEffect(() => {

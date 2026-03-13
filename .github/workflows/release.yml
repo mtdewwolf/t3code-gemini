@@ -254,13 +254,18 @@ jobs:
         run: bun run build --filter=@t3tools/web --filter=t3
 
       - name: Publish CLI package
-        run: bun run apps/server/scripts/cli.ts publish --tag latest --app-version "${{ needs.preflight.outputs.version }}" --verbose
+        run: |
+          TAG="latest"
+          if [[ "${{ needs.preflight.outputs.is_prerelease }}" == "true" ]]; then
+            TAG="next"
+          fi
+          bun run apps/server/scripts/cli.ts publish --tag "$TAG" --app-version "${{ needs.preflight.outputs.version }}" --verbose
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   release:
     name: Publish GitHub Release
-    needs: [preflight, build]
+    needs: [preflight, build, publish_cli]
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -312,7 +317,7 @@ jobs:
 
   finalize:
     name: Finalize release
-    needs: [preflight, release]
+    needs: [preflight, publish_cli, release]
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
