@@ -1,5 +1,4 @@
 import * as Schema from "effect/Schema";
-import * as Record from "effect/Record";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const isomorphicLocalStorage: Storage =
@@ -10,7 +9,7 @@ const isomorphicLocalStorage: Storage =
         return {
           clear: () => store.clear(),
           getItem: (_) => store.get(_) ?? null,
-          key: (_) => Record.keys(store).at(_) ?? null,
+          key: (_) => Array.from(store.keys()).at(_) ?? null,
           get length() {
             return store.size;
           },

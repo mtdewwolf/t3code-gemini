@@ -91,4 +91,4 @@ jobs:
           node-version-file: package.json
 
       - name: Exercise release-only workflow steps
-        run: node scripts/release-smoke.ts
+        run: bun run scripts/release-smoke.ts

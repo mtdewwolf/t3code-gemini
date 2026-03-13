@@ -255,12 +255,64 @@ function ChatMarkdown({ text, cwd, isStreaming = false }: ChatMarkdownProps) {
               event.stopPropagation();
               const api = readNativeApi();
               if (api) {
-                void openInPreferredEditor(api, targetPath);
+                openInPreferredEditor(api, targetPath).catch((error) => {
+                  console.warn("Unable to open file in preferred editor.", error);
+                });
               } else {
                 console.warn("Native API not found. Unable to open file in editor.");
               }
             }}
           />
+        );
+      },
+      code({ node: _node, className, children, ...props }) {
+        // Only transform inline code (fenced code blocks have language classes
+        // and are handled by the `pre` override).
+        if (className) {
+          return (
+            <code className={className} {...props}>
+              {children}
+            </code>
+          );
+        }
+
+        const text = typeof children === "string" ? children : nodeToPlainText(children);
+        const targetPath = resolveMarkdownFileLinkTarget(text.trim(), cwd);
+
+        if (!targetPath) {
+          return <code {...props}>{children}</code>;
+        }
+
+        // Strip :line:col suffix — OS default apps don't understand them.
+        const pathForOpen = targetPath.replace(/:\d+(?::\d+)?$/, "");
+
+        return (
+          <code
+            {...props}
+            className="cursor-pointer underline decoration-dotted underline-offset-2 hover:text-foreground"
+            role="button"
+            tabIndex={0}
+            title={`Open ${text.trim()}`}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              const api = readNativeApi();
+              if (api) {
+                void api.shell.openInEditor(pathForOpen, "file-manager");
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                const api = readNativeApi();
+                if (api) {
+                  void api.shell.openInEditor(pathForOpen, "file-manager");
+                }
+              }
+            }}
+          >
+            {children}
+          </code>
         );
       },
       pre({ node: _node, children, ...props }) {

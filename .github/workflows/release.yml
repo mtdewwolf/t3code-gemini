@@ -248,13 +248,15 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Align package versions to release version
-        run: node scripts/update-release-package-versions.ts "${{ needs.preflight.outputs.version }}"
+        run: bun run scripts/update-release-package-versions.ts "${{ needs.preflight.outputs.version }}"
 
       - name: Build CLI package
         run: bun run build --filter=@t3tools/web --filter=t3
 
       - name: Publish CLI package
-        run: node apps/server/scripts/cli.ts publish --tag latest --app-version "${{ needs.preflight.outputs.version }}" --verbose
+        run: bun run apps/server/scripts/cli.ts publish --tag latest --app-version "${{ needs.preflight.outputs.version }}" --verbose
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   release:
     name: Publish GitHub Release
@@ -280,7 +282,7 @@ jobs:
 
       - name: Merge macOS updater manifests
         run: |
-          node scripts/merge-mac-update-manifests.ts \
+          bun run scripts/merge-mac-update-manifests.ts \
             release-assets/latest-mac.yml \
             release-assets/latest-mac-x64.yml
           rm -f release-assets/latest-mac-x64.yml

@@ -801,6 +801,7 @@ export default function GitActionsControl({ gitCwd, activeThreadId }: GitActions
                   <div className="flex items-center gap-2">
                     {isEditingFiles && allFiles.length > 0 && (
                       <Checkbox
+                        aria-label="Toggle all files for commit"
                         checked={allSelected}
                         indeterminate={!allSelected && !noneSelected}
                         onCheckedChange={() => {
@@ -842,6 +843,7 @@ export default function GitActionsControl({ gitCwd, activeThreadId }: GitActions
                             >
                               {isEditingFiles && (
                                 <Checkbox
+                                  aria-label={`Toggle ${file.path} for commit`}
                                   checked={!excludedFiles.has(file.path)}
                                   onCheckedChange={() => {
                                     setExcludedFiles((prev) => {
