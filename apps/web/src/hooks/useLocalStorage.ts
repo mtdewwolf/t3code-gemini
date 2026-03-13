@@ -93,8 +93,10 @@ export function useLocalStorage<T, E>(
     }
   }, []);
 
-  // Persist to localStorage whenever storedValue changes
+  // Persist to localStorage whenever storedValue changes.
+  // Use a flag to prevent self-triggered local-change events from causing a feedback loop.
   const isInitialMount = useRef(true);
+  const isSelfDispatch = useRef(false);
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
@@ -106,6 +108,7 @@ export function useLocalStorage<T, E>(
       } else {
         setLocalStorageItem(key, storedValue, schema);
       }
+      isSelfDispatch.current = true;
       dispatchLocalStorageChange(key);
     } catch (error) {
       console.error("[LOCALSTORAGE] Error:", error);
@@ -146,6 +149,10 @@ export function useLocalStorage<T, E>(
 
     const handleLocalChange = (event: CustomEvent<LocalStorageChangeDetail>) => {
       if (event.detail.key === key) {
+        if (isSelfDispatch.current) {
+          isSelfDispatch.current = false;
+          return;
+        }
         syncFromStorage();
       }
     };

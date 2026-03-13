@@ -298,7 +298,9 @@ function ChatMarkdown({ text, cwd, isStreaming = false }: ChatMarkdownProps) {
               event.stopPropagation();
               const api = readNativeApi();
               if (api) {
-                void api.shell.openInEditor(pathForOpen, "file-manager");
+                api.shell.openInEditor(pathForOpen, "file-manager").catch((error) => {
+                  console.warn("Unable to open in file manager.", error);
+                });
               }
             }}
             onKeyDown={(event) => {
@@ -306,7 +308,9 @@ function ChatMarkdown({ text, cwd, isStreaming = false }: ChatMarkdownProps) {
                 event.preventDefault();
                 const api = readNativeApi();
                 if (api) {
-                  void api.shell.openInEditor(pathForOpen, "file-manager");
+                  api.shell.openInEditor(pathForOpen, "file-manager").catch((error) => {
+                    console.warn("Unable to open in file manager.", error);
+                  });
                 }
               }
             }}
