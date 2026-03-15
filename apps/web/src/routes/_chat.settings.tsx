@@ -214,36 +214,78 @@ function SettingsRouteView() {
   const [updateState, setUpdateState] = useState<DesktopUpdateState | null>(null);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
 
+  const hasDesktopBridge = isElectron && !!window.desktopBridge;
+
   useEffect(() => {
-    if (!isElectron || !window.desktopBridge) return;
-    const bridge = window.desktopBridge;
-    void bridge.getUpdateState().then(setUpdateState);
+    if (!hasDesktopBridge) return;
+    const bridge = window.desktopBridge!;
+    void bridge
+      .getUpdateState()
+      .then(setUpdateState)
+      .catch(() => {});
     const unsubscribe = bridge.onUpdateState(setUpdateState);
     return unsubscribe;
-  }, []);
+  }, [hasDesktopBridge]);
 
   const handleCheckForUpdate = useCallback(async () => {
-    if (!isElectron || !window.desktopBridge) return;
+    if (!hasDesktopBridge) return;
     setIsCheckingUpdate(true);
     try {
-      const state = await window.desktopBridge.checkForUpdate();
+      const state = await window.desktopBridge!.checkForUpdate();
       setUpdateState(state);
+    } catch {
+      setUpdateState((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "error",
+              message: "Failed to check for updates.",
+              errorContext: "check",
+            }
+          : prev,
+      );
     } finally {
       setIsCheckingUpdate(false);
     }
-  }, []);
+  }, [hasDesktopBridge]);
 
   const handleDownloadUpdate = useCallback(async () => {
-    if (!isElectron || !window.desktopBridge) return;
-    const result = await window.desktopBridge.downloadUpdate();
-    setUpdateState(result.state);
-  }, []);
+    if (!hasDesktopBridge) return;
+    try {
+      const result = await window.desktopBridge!.downloadUpdate();
+      setUpdateState(result.state);
+    } catch (error) {
+      setUpdateState((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "error",
+              message: error instanceof Error ? error.message : "Failed to download update.",
+              errorContext: "download",
+            }
+          : prev,
+      );
+    }
+  }, [hasDesktopBridge]);
 
   const handleInstallUpdate = useCallback(async () => {
-    if (!isElectron || !window.desktopBridge) return;
-    const result = await window.desktopBridge.installUpdate();
-    setUpdateState(result.state);
-  }, []);
+    if (!hasDesktopBridge) return;
+    try {
+      const result = await window.desktopBridge!.installUpdate();
+      setUpdateState(result.state);
+    } catch (error) {
+      setUpdateState((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "error",
+              message: error instanceof Error ? error.message : "Failed to install update.",
+              errorContext: "install",
+            }
+          : prev,
+      );
+    }
+  }, [hasDesktopBridge]);
 
   const codexBinaryPath = settings.codexBinaryPath;
   const codexHomePath = settings.codexHomePath;
@@ -1056,7 +1098,7 @@ function SettingsRouteView() {
                   </div>
                   <div className="ml-3 flex shrink-0 items-center gap-2">
                     <code className="text-xs font-medium text-muted-foreground">{APP_VERSION}</code>
-                    {isElectron ? (
+                    {hasDesktopBridge ? (
                       <>
                         {updateState?.status === "available" ? (
                           <Button size="xs" onClick={handleDownloadUpdate}>
