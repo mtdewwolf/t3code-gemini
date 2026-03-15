@@ -61,12 +61,13 @@ const checkNodeSqliteCompat = () => {
   const parts = process.versions.node.split(".").map(Number);
   const major = parts[0] ?? 0;
   const minor = parts[1] ?? 0;
-  const supported = (major === 22 && minor >= 16) || (major === 23 && minor >= 11) || major >= 24;
+  const supported =
+    (major === 22 && minor >= 16) || (major === 23 && minor >= 11) || (major === 24 && minor >= 10) || major >= 25;
 
   if (!supported) {
     return Effect.die(
       `Node.js ${process.versions.node} is missing required node:sqlite APIs ` +
-        `(StatementSync.columns). Upgrade to Node.js >=22.16, >=23.11, or >=24.`,
+        `(StatementSync.columns). Upgrade to Node.js >=22.16, >=23.11, or >=24.10.`,
     );
   }
   return Effect.void;
