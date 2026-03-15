@@ -1068,12 +1068,16 @@ function SettingsRouteView() {
                             Restart & Install
                           </Button>
                         ) : null}
-                        {updateState?.status === "error" && updateState.errorContext === "download" && updateState.availableVersion ? (
+                        {updateState?.status === "error" &&
+                        updateState.errorContext === "download" &&
+                        updateState.availableVersion ? (
                           <Button size="xs" variant="outline" onClick={handleDownloadUpdate}>
                             Retry Download
                           </Button>
                         ) : null}
-                        {updateState?.status === "error" && updateState.errorContext === "install" && updateState.downloadedVersion ? (
+                        {updateState?.status === "error" &&
+                        updateState.errorContext === "install" &&
+                        updateState.downloadedVersion ? (
                           <Button size="xs" variant="outline" onClick={handleInstallUpdate}>
                             Retry Install
                           </Button>
@@ -1081,7 +1085,11 @@ function SettingsRouteView() {
                         <Button
                           size="xs"
                           variant="outline"
-                          disabled={isCheckingUpdate || updateState?.status === "checking" || updateState?.status === "downloading"}
+                          disabled={
+                            isCheckingUpdate ||
+                            updateState?.status === "checking" ||
+                            updateState?.status === "downloading"
+                          }
                           onClick={handleCheckForUpdate}
                         >
                           {isCheckingUpdate || updateState?.status === "checking"
@@ -1092,7 +1100,8 @@ function SettingsRouteView() {
                     ) : null}
                   </div>
                 </div>
-                {updateState?.status === "downloading" && typeof updateState.downloadPercent === "number" ? (
+                {updateState?.status === "downloading" &&
+                typeof updateState.downloadPercent === "number" ? (
                   <div className="px-1">
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                       <div
