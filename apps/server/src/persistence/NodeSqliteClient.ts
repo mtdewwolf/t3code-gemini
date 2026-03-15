@@ -62,7 +62,10 @@ const checkNodeSqliteCompat = () => {
   const major = parts[0] ?? 0;
   const minor = parts[1] ?? 0;
   const supported =
-    (major === 22 && minor >= 16) || (major === 23 && minor >= 11) || (major === 24 && minor >= 10) || major >= 25;
+    (major === 22 && minor >= 16) ||
+    (major === 23 && minor >= 11) ||
+    (major === 24 && minor >= 10) ||
+    major >= 25;
 
   if (!supported) {
     return Effect.die(
