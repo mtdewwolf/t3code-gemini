@@ -103,6 +103,16 @@ const AppSettingsSchema = Schema.Struct({
   providerAccentColors: Schema.Record(Schema.String, Schema.String).pipe(
     Schema.withConstructorDefault(() => Option.some({} as Record<string, string>)),
   ),
+  customAccentPresets: Schema.Array(
+    Schema.Struct({
+      label: Schema.String,
+      value: Schema.String,
+    }),
+  ).pipe(
+    Schema.withConstructorDefault(() =>
+      Option.some([] as ReadonlyArray<{ label: string; value: string }>),
+    ),
+  ),
 });
 export type AppSettings = typeof AppSettingsSchema.Type;
 export interface AppModelOption {

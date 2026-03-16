@@ -576,6 +576,43 @@ function SettingsRouteView() {
                         </button>
                       );
                     })}
+                    {settings.customAccentPresets.map((preset) => {
+                      const selected = accentColor === preset.value;
+                      return (
+                        <button
+                          key={`custom:${preset.value}:${preset.label}`}
+                          type="button"
+                          className={`group inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs transition-colors ${
+                            selected
+                              ? "border-primary/60 bg-primary/8 text-foreground"
+                              : "border-border bg-background text-muted-foreground hover:bg-accent"
+                          }`}
+                          onClick={() => updateSettings({ accentColor: preset.value })}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="size-3 rounded-full border border-black/20"
+                            style={{ backgroundColor: preset.value }}
+                          />
+                          {preset.label}
+                          <span
+                            role="button"
+                            aria-label={`Remove ${preset.label} preset`}
+                            className="ml-0.5 hidden text-muted-foreground/50 hover:text-foreground group-hover:inline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateSettings({
+                                customAccentPresets: settings.customAccentPresets.filter(
+                                  (p) => p.value !== preset.value || p.label !== preset.label,
+                                ),
+                              });
+                            }}
+                          >
+                            &times;
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-background px-3 py-2">
@@ -595,6 +632,7 @@ function SettingsRouteView() {
                       }
                     />
                     <code className="text-xs text-muted-foreground">{accentColor}</code>
+                    <span className="flex-1" />
                     {accentColor !== DEFAULT_ACCENT_COLOR ? (
                       <Button
                         size="xs"
@@ -604,6 +642,27 @@ function SettingsRouteView() {
                         Reset
                       </Button>
                     ) : null}
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      onClick={() => {
+                        const allPresets = [
+                          ...ACCENT_COLOR_PRESETS,
+                          ...settings.customAccentPresets,
+                        ];
+                        if (allPresets.some((p) => p.value === accentColor)) return;
+                        const label = window.prompt("Preset name:");
+                        if (!label?.trim()) return;
+                        updateSettings({
+                          customAccentPresets: [
+                            ...settings.customAccentPresets,
+                            { label: label.trim(), value: accentColor },
+                          ],
+                        });
+                      }}
+                    >
+                      Save as Preset
+                    </Button>
                   </div>
 
                   <label className="block space-y-1">
