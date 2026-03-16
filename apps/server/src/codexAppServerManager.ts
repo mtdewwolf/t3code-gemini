@@ -27,6 +27,7 @@ import {
   isCodexCliVersionSupported,
   parseCodexCliVersion,
 } from "./provider/codexCliVersion";
+import { createLogger } from "./logger";
 
 type PendingRequestKey = string;
 
@@ -514,6 +515,7 @@ export interface CodexAppServerManagerEvents {
 
 export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEvents> {
   private readonly sessions = new Map<ThreadId, CodexSessionContext>();
+  private readonly logger = createLogger("codex");
 
   private runPromise: (effect: Effect.Effect<unknown, never>) => Promise<unknown>;
   constructor(services?: ServiceMap.ServiceMap<never>) {
@@ -585,21 +587,21 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
       this.writeMessage(context, { method: "initialized" });
       try {
         const modelListResponse = await this.sendRequest(context, "model/list", {});
-        console.log("codex model/list response", modelListResponse);
+        this.logger.info("model/list response", { response: modelListResponse });
       } catch (error) {
-        console.log("codex model/list failed", error);
+        this.logger.warn("model/list failed", { error });
       }
       try {
         const accountReadResponse = await this.sendRequest(context, "account/read", {});
-        console.log("codex account/read response", accountReadResponse);
+        this.logger.info("account/read response", { response: accountReadResponse });
         context.account = readCodexAccountSnapshot(accountReadResponse);
-        console.log("codex subscription status", {
+        this.logger.info("subscription status", {
           type: context.account.type,
           planType: context.account.planType,
           sparkEnabled: context.account.sparkEnabled,
         });
       } catch (error) {
-        console.log("codex account/read failed", error);
+        this.logger.warn("account/read failed", { error });
       }
 
       const normalizedModel = resolveCodexModelForAccount(

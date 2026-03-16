@@ -1686,9 +1686,9 @@ describe("WebSocket Server", () => {
     };
 
     const status = vi.fn(() => Effect.succeed(statusResult));
-    const runStackedAction = vi.fn(() => Effect.void as any);
-    const resolvePullRequest = vi.fn(() => Effect.void as any);
-    const preparePullRequestThread = vi.fn(() => Effect.void as any);
+    const runStackedAction = vi.fn(() => Effect.die("not implemented"));
+    const resolvePullRequest = vi.fn(() => Effect.die("not implemented"));
+    const preparePullRequestThread = vi.fn(() => Effect.die("not implemented"));
     const gitManager: GitManagerShape = {
       status,
       resolvePullRequest,
@@ -1729,10 +1729,10 @@ describe("WebSocket Server", () => {
     };
 
     const gitManager: GitManagerShape = {
-      status: vi.fn(() => Effect.void as any),
+      status: vi.fn(() => Effect.die("not implemented")),
       resolvePullRequest: vi.fn(() => Effect.succeed(resolvePullRequestResult)),
       preparePullRequestThread: vi.fn(() => Effect.succeed(preparePullRequestThreadResult)),
-      runStackedAction: vi.fn(() => Effect.void as any),
+      runStackedAction: vi.fn(() => Effect.die("not implemented")),
     };
 
     server = await createTestServer({ cwd: "/test", gitManager });
@@ -1777,9 +1777,9 @@ describe("WebSocket Server", () => {
       ),
     );
     const gitManager: GitManagerShape = {
-      status: vi.fn(() => Effect.void as any),
-      resolvePullRequest: vi.fn(() => Effect.void as any),
-      preparePullRequestThread: vi.fn(() => Effect.void as any),
+      status: vi.fn(() => Effect.die("not implemented")),
+      resolvePullRequest: vi.fn(() => Effect.die("not implemented")),
+      preparePullRequestThread: vi.fn(() => Effect.die("not implemented")),
       runStackedAction,
     };
 

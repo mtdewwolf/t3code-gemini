@@ -1588,9 +1588,9 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
 
     const listSessions: CopilotAdapterShape["listSessions"] = () =>
       Effect.sync(() =>
-        Array.from(sessions.values()).map(
-          (record) =>
-            ({
+        Array.from(sessions.values()).map((record) =>
+          Object.assign(
+            {
               provider: PROVIDER,
               status: record.currentTurnId ? "running" : "ready",
               runtimeMode: record.runtimeMode,
@@ -1598,11 +1598,12 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
               resumeCursor: record.session.sessionId,
               createdAt: record.createdAt,
               updatedAt: record.updatedAt,
-              ...(record.cwd ? { cwd: record.cwd } : {}),
-              ...(record.model ? { model: record.model } : {}),
-              ...(record.currentTurnId ? { activeTurnId: record.currentTurnId } : {}),
-              ...(record.lastError ? { lastError: record.lastError } : {}),
-            }) satisfies ProviderSession,
+            } as ProviderSession,
+            record.cwd ? { cwd: record.cwd } : undefined,
+            record.model ? { model: record.model } : undefined,
+            record.currentTurnId ? { activeTurnId: record.currentTurnId } : undefined,
+            record.lastError ? { lastError: record.lastError } : undefined,
+          ),
         ),
       );
 
@@ -1761,18 +1762,22 @@ export async function fetchCopilotUsage(): Promise<{
             resetDate?: string;
           }
         >,
-      ).map(([key, snap]) => ({
-        plan: key,
-        limit: Math.max(0, Math.trunc(snap.entitlementRequests)),
-        used: Math.max(0, Math.trunc(snap.usedRequests)),
-        remaining: Math.max(
-          0,
-          Math.trunc(snap.entitlementRequests) - Math.trunc(snap.usedRequests),
+      ).map(([key, snap]) =>
+        Object.assign(
+          {
+            plan: key,
+            limit: Math.max(0, Math.trunc(snap.entitlementRequests)),
+            used: Math.max(0, Math.trunc(snap.usedRequests)),
+            remaining: Math.max(
+              0,
+              Math.trunc(snap.entitlementRequests) - Math.trunc(snap.usedRequests),
+            ),
+            percentageRemaining: snap.remainingPercentage,
+            overage: Math.max(0, Math.trunc(snap.overage)),
+          },
+          snap.resetDate ? { resetDate: snap.resetDate } : undefined,
         ),
-        percentageRemaining: snap.remainingPercentage,
-        overage: Math.max(0, Math.trunc(snap.overage)),
-        ...(snap.resetDate ? { resetDate: snap.resetDate } : {}),
-      }));
+      );
       return { provider: "copilot", quotas };
     } finally {
       await client.stop().catch(() => {});

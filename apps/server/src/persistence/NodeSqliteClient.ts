@@ -4,7 +4,7 @@
  *
  * @module SqliteClient
  */
-import { DatabaseSync, type StatementSync } from "node:sqlite";
+import { DatabaseSync, type SQLInputValue, type StatementSync } from "node:sqlite";
 
 import * as Cache from "effect/Cache";
 import * as Config from "effect/Config";
@@ -126,9 +126,9 @@ const makeWithDatabase = (
           statement.setReadBigInts(Boolean(ServiceMap.get(fiber.services, Client.SafeIntegers)));
           try {
             if (hasRows(statement)) {
-              return Effect.succeed(statement.all(...(params as any)));
+              return Effect.succeed(statement.all(...(params as SQLInputValue[])));
             }
-            const result = statement.run(...(params as any));
+            const result = statement.run(...(params as SQLInputValue[]));
             return Effect.succeed(raw ? (result as unknown as ReadonlyArray<any>) : []);
           } catch (cause) {
             return Effect.fail(new SqlError({ cause, message: "Failed to execute statement" }));
@@ -147,11 +147,11 @@ const makeWithDatabase = (
                 if (hasRows(statement)) {
                   statement.setReturnArrays(true);
                   // Safe to cast to array after we've setReturnArrays(true)
-                  return statement.all(...(params as any)) as unknown as ReadonlyArray<
+                  return statement.all(...(params as SQLInputValue[])) as unknown as ReadonlyArray<
                     ReadonlyArray<unknown>
                   >;
                 }
-                statement.run(...(params as any));
+                statement.run(...(params as SQLInputValue[]));
                 return [];
               },
               catch: (cause) => new SqlError({ cause, message: "Failed to execute statement" }),

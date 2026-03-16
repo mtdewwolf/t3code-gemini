@@ -36,7 +36,7 @@ import { useStore } from "../store";
 import { type Project, type ProjectScript, type Thread } from "../types";
 import { CommandDialog, CommandDialogPopup, CommandFooter } from "./ui/command";
 import { ScrollArea } from "./ui/scroll-area";
-import { cn } from "~/lib/utils";
+import { cn, formatRelativeTime } from "~/lib/utils";
 
 type PaletteGroupId = "actions" | "scripts" | "projects" | "threads";
 
@@ -83,16 +83,6 @@ const GROUP_LABELS: Record<PaletteGroupId, string> = {
   projects: "Projects",
   threads: "Threads",
 };
-
-function formatRelativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
 
 function threadSubtitle(thread: Thread, projectName: string | undefined): string {
   const parts: string[] = [];

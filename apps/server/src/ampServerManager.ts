@@ -355,6 +355,7 @@ export class AmpServerManager extends EventEmitter<{
     } catch (err) {
       throw new Error(
         `Failed to write to AMP stdin for session ${input.threadId}: ${err instanceof Error ? err.message : String(err)}`,
+        { cause: err },
       );
     }
 
