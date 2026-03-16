@@ -678,7 +678,7 @@ function SettingsRouteView() {
                       >
                         <Input
                           ref={presetNameRef}
-                          className="h-7 w-32 text-xs"
+                          className="h-7 w-32 py-0 text-xs leading-7"
                           placeholder="Preset name"
                           value={presetNameInput}
                           onChange={(e) => setPresetNameInput(e.target.value)}
