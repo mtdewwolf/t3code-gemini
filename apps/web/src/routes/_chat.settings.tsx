@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { type DesktopUpdateState, type ProviderKind } from "@t3tools/contracts";
 import { getModelOptions, normalizeModelSlug } from "@t3tools/shared/model";
 
@@ -189,6 +189,92 @@ function patchCustomModels(provider: ProviderKind, models: string[]) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Log syntax highlighting
+// ---------------------------------------------------------------------------
+
+const LOG_TOKEN_PATTERN =
+  /(?<key>timestamp|level|fiber|message|cause|span\.\w+)=(?<value>"(?:[^"\\]|\\.)*"|[^\s]+)/g;
+
+const LOG_LEVEL_COLORS: Record<string, string> = {
+  Info: "text-blue-400",
+  Warning: "text-amber-400",
+  Error: "text-red-400",
+  Debug: "text-zinc-500",
+  Fatal: "text-red-500 font-semibold",
+};
+
+function highlightLogLine(line: string): ReactNode {
+  const parts: ReactNode[] = [];
+  let lastIndex = 0;
+
+  for (const match of line.matchAll(LOG_TOKEN_PATTERN)) {
+    const start = match.index;
+    if (start > lastIndex) {
+      parts.push(line.slice(lastIndex, start));
+    }
+
+    const key = match.groups?.key ?? "";
+    const value = match.groups?.value ?? "";
+
+    if (key === "timestamp") {
+      parts.push(
+        <span key={start} className="text-zinc-500">
+          {key}={value}
+        </span>,
+      );
+    } else if (key === "level") {
+      const levelClass = LOG_LEVEL_COLORS[value] ?? "text-muted-foreground";
+      parts.push(
+        <span key={start} className={levelClass}>
+          {key}={value}
+        </span>,
+      );
+    } else if (key === "fiber") {
+      parts.push(
+        <span key={start} className="text-violet-400/70">
+          {key}={value}
+        </span>,
+      );
+    } else if (key === "message" || key === "cause") {
+      parts.push(
+        <span key={start}>
+          <span className="text-zinc-500">{key}=</span>
+          <span className="text-foreground">{value}</span>
+        </span>,
+      );
+    } else {
+      parts.push(
+        <span key={start} className="text-zinc-500">
+          {key}={value}
+        </span>,
+      );
+    }
+
+    lastIndex = start + match[0].length;
+  }
+
+  if (lastIndex < line.length) {
+    parts.push(line.slice(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : line;
+}
+
+function HighlightedLogContent({ content }: { content: string }) {
+  const lines = content.split("\n");
+  return (
+    <>
+      {lines.map((line, i) => (
+        <span key={i}>
+          {highlightLogLine(line)}
+          {i < lines.length - 1 ? "\n" : null}
+        </span>
+      ))}
+    </>
+  );
+}
+
 function SettingsRouteView() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const { settings, defaults, updateSettings } = useAppSettings();
@@ -214,6 +300,32 @@ function SettingsRouteView() {
   const [updateState, setUpdateState] = useState<DesktopUpdateState | null>(null);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
 
+  const [logDir, setLogDir] = useState<string | null>(null);
+  const [logFiles, setLogFiles] = useState<string[]>([]);
+  const [selectedLogFile, setSelectedLogFile] = useState<string | null>(null);
+  const [logContent, setLogContent] = useState<string>("");
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const [isLogViewerOpen, setIsLogViewerOpen] = useState(false);
+  const logViewerRef = useRef<HTMLPreElement>(null);
+
+  const loadLogFile = useCallback(async (filename: string) => {
+    setIsLoadingLogs(true);
+    try {
+      const api = ensureNativeApi();
+      const result = await api.logs.read(filename);
+      setLogContent(result.content);
+      requestAnimationFrame(() => {
+        if (logViewerRef.current) {
+          logViewerRef.current.scrollTop = logViewerRef.current.scrollHeight;
+        }
+      });
+    } catch {
+      setLogContent("Failed to read log file.");
+    } finally {
+      setIsLoadingLogs(false);
+    }
+  }, []);
+
   const hasDesktopBridge = isElectron && !!window.desktopBridge;
 
   useEffect(() => {
@@ -226,6 +338,14 @@ function SettingsRouteView() {
     const unsubscribe = bridge.onUpdateState(setUpdateState);
     return unsubscribe;
   }, [hasDesktopBridge]);
+
+  useEffect(() => {
+    const api = ensureNativeApi();
+    void api.logs
+      .getDir()
+      .then((result) => setLogDir(result.dir))
+      .catch(() => {});
+  }, []);
 
   const handleCheckForUpdate = useCallback(async () => {
     if (!hasDesktopBridge) return;
@@ -290,6 +410,8 @@ function SettingsRouteView() {
   const codexBinaryPath = settings.codexBinaryPath;
   const codexHomePath = settings.codexHomePath;
   const accentColor = settings.accentColor;
+  const [presetNameInput, setPresetNameInput] = useState<string | null>(null);
+  const presetNameRef = useRef<HTMLInputElement>(null);
   const keybindingsConfigPath = serverConfigQuery.data?.keybindingsConfigPath ?? null;
   const availableEditors = serverConfigQuery.data?.availableEditors;
 
@@ -474,6 +596,46 @@ function SettingsRouteView() {
                         </button>
                       );
                     })}
+                    {settings.customAccentPresets.map((preset) => {
+                      const selected = accentColor === preset.value;
+                      return (
+                        <div
+                          key={`custom:${preset.value}:${preset.label}`}
+                          className={`group inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs transition-colors ${
+                            selected
+                              ? "border-primary/60 bg-primary/8 text-foreground"
+                              : "border-border bg-background text-muted-foreground hover:bg-accent"
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-2"
+                            onClick={() => updateSettings({ accentColor: preset.value })}
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="size-3 rounded-full border border-black/20"
+                              style={{ backgroundColor: preset.value }}
+                            />
+                            {preset.label}
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`Remove ${preset.label} preset`}
+                            className="ml-0.5 hidden text-muted-foreground/50 hover:text-foreground group-hover:inline"
+                            onClick={() => {
+                              updateSettings({
+                                customAccentPresets: settings.customAccentPresets.filter(
+                                  (p) => p.value !== preset.value || p.label !== preset.label,
+                                ),
+                              });
+                            }}
+                          >
+                            &times;
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-background px-3 py-2">
@@ -493,6 +655,7 @@ function SettingsRouteView() {
                       }
                     />
                     <code className="text-xs text-muted-foreground">{accentColor}</code>
+                    <span className="flex-1" />
                     {accentColor !== DEFAULT_ACCENT_COLOR ? (
                       <Button
                         size="xs"
@@ -502,6 +665,62 @@ function SettingsRouteView() {
                         Reset
                       </Button>
                     ) : null}
+                    {presetNameInput === null ? (
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        onClick={() => {
+                          const allPresets = [
+                            ...ACCENT_COLOR_PRESETS,
+                            ...settings.customAccentPresets,
+                          ];
+                          if (allPresets.some((p) => p.value === accentColor)) return;
+                          setPresetNameInput("");
+                          requestAnimationFrame(() => presetNameRef.current?.focus());
+                        }}
+                      >
+                        Save as Preset
+                      </Button>
+                    ) : (
+                      <form
+                        className="flex items-center gap-2"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const name = presetNameInput.trim();
+                          if (!name) return;
+                          if (
+                            settings.customAccentPresets.some(
+                              (p) => p.label.toLowerCase() === name.toLowerCase(),
+                            )
+                          )
+                            return;
+                          updateSettings({
+                            customAccentPresets: [
+                              ...settings.customAccentPresets,
+                              { label: name, value: accentColor },
+                            ],
+                          });
+                          setPresetNameInput(null);
+                        }}
+                      >
+                        <Input
+                          ref={presetNameRef}
+                          className="h-7 w-32 py-0 text-xs leading-7"
+                          placeholder="Preset name"
+                          value={presetNameInput}
+                          onChange={(e) => setPresetNameInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") setPresetNameInput(null);
+                          }}
+                          onBlur={() => {
+                            if (!presetNameInput.trim()) setPresetNameInput(null);
+                          }}
+                        />
+                        <Button size="xs" type="submit" disabled={!presetNameInput.trim()}>
+                          Save
+                        </Button>
+                      </form>
+                    )}
                   </div>
 
                   <label className="block space-y-1">
@@ -1063,6 +1282,117 @@ function SettingsRouteView() {
                 </div>
               ) : null}
             </section>
+
+            <section className="rounded-2xl border border-border bg-card p-5">
+              <div className="mb-4">
+                <h2 className="text-sm font-medium text-foreground">Logs</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Application log files for debugging.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {logDir ? (
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2">
+                    <code className="min-w-0 truncate text-xs text-muted-foreground select-all">
+                      {logDir}
+                    </code>
+                    {hasDesktopBridge ? (
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        className="shrink-0"
+                        onClick={() => void window.desktopBridge!.openLogDir()}
+                      >
+                        Show in File Manager
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <Button
+                  size="xs"
+                  variant="outline"
+                  disabled={isLoadingLogs}
+                  onClick={async () => {
+                    if (isLogViewerOpen) {
+                      setIsLogViewerOpen(false);
+                      return;
+                    }
+                    setIsLoadingLogs(true);
+                    try {
+                      const api = ensureNativeApi();
+                      const result = await api.logs.list();
+                      const files = result.files;
+                      setLogFiles(files);
+                      if (files.length > 0 && !selectedLogFile) {
+                        setSelectedLogFile(files[0]!);
+                        await loadLogFile(files[0]!);
+                      }
+                      setIsLogViewerOpen(true);
+                    } catch {
+                      setLogContent("Failed to load log files.");
+                      setIsLogViewerOpen(true);
+                    } finally {
+                      setIsLoadingLogs(false);
+                    }
+                  }}
+                >
+                  {isLoadingLogs
+                    ? "Loading..."
+                    : isLogViewerOpen
+                      ? "Hide Log Viewer"
+                      : "View in App"}
+                </Button>
+
+                {isLogViewerOpen ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={selectedLogFile ?? ""}
+                        onValueChange={(value) => {
+                          if (!value) return;
+                          setSelectedLogFile(value);
+                          void loadLogFile(value);
+                        }}
+                      >
+                        <SelectTrigger className="h-7 w-60 text-xs">
+                          <SelectValue placeholder="Select a log file" />
+                        </SelectTrigger>
+                        <SelectPopup>
+                          {logFiles.map((file) => (
+                            <SelectItem key={file} value={file}>
+                              {file}
+                            </SelectItem>
+                          ))}
+                        </SelectPopup>
+                      </Select>
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        disabled={!selectedLogFile || isLoadingLogs}
+                        onClick={() => {
+                          if (selectedLogFile) void loadLogFile(selectedLogFile);
+                        }}
+                      >
+                        Refresh
+                      </Button>
+                    </div>
+                    <pre
+                      ref={logViewerRef}
+                      className="max-h-96 overflow-auto rounded-lg border border-border bg-background p-3 font-mono text-xs leading-relaxed text-foreground"
+                    >
+                      {logContent ? (
+                        <HighlightedLogContent content={logContent} />
+                      ) : (
+                        "No log content."
+                      )}
+                    </pre>
+                  </div>
+                ) : null}
+              </div>
+            </section>
+
             <section className="rounded-2xl border border-border bg-card p-5">
               <div className="mb-4">
                 <h2 className="text-sm font-medium text-foreground">About</h2>
