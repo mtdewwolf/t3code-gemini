@@ -30,3 +30,15 @@ export const newProjectId = (): ProjectId => ProjectId.makeUnsafe(randomUUID());
 export const newThreadId = (): ThreadId => ThreadId.makeUnsafe(randomUUID());
 
 export const newMessageId = (): MessageId => MessageId.makeUnsafe(randomUUID());
+
+export function formatRelativeTime(iso: string): string {
+  const timestamp = new Date(iso).getTime();
+  if (!Number.isFinite(timestamp)) return "just now";
+  const diff = Date.now() - timestamp;
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}

@@ -37,11 +37,6 @@ interface SearchableWorkspaceEntry extends ProjectEntry {
   normalizedName: string;
 }
 
-interface RankedWorkspaceEntry {
-  entry: SearchableWorkspaceEntry;
-  score: number;
-}
-
 const workspaceIndexCache = new Map<string, WorkspaceIndex>();
 const inFlightWorkspaceIndexBuilds = new Map<string, Promise<WorkspaceIndex>>();
 

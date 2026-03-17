@@ -260,15 +260,8 @@ export function getSlashModelOptions(
   });
 }
 
-let listeners: Array<() => void> = [];
 let cachedRawSettings: string | null = null;
 let cachedSnapshot: AppSettings = DEFAULT_APP_SETTINGS;
-
-function emitChange(): void {
-  for (const listener of listeners) {
-    listener();
-  }
-}
 
 function migratePersistedAppSettings(value: unknown): unknown {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -311,38 +304,6 @@ export function getAppSettingsSnapshot(): AppSettings {
   cachedRawSettings = raw;
   cachedSnapshot = parsePersistedSettings(raw);
   return cachedSnapshot;
-}
-
-function persistSettings(next: AppSettings): void {
-  if (typeof window === "undefined") return;
-
-  const raw = JSON.stringify(next);
-  try {
-    if (raw !== cachedRawSettings) {
-      window.localStorage.setItem(APP_SETTINGS_STORAGE_KEY, raw);
-    }
-  } catch {
-    // Best-effort persistence only.
-  }
-
-  cachedRawSettings = raw;
-  cachedSnapshot = next;
-}
-
-function subscribe(listener: () => void): () => void {
-  listeners.push(listener);
-
-  const onStorage = (event: StorageEvent) => {
-    if (event.key === APP_SETTINGS_STORAGE_KEY) {
-      emitChange();
-    }
-  };
-
-  window.addEventListener("storage", onStorage);
-  return () => {
-    listeners = listeners.filter((entry) => entry !== listener);
-    window.removeEventListener("storage", onStorage);
-  };
 }
 
 export function useAppSettings() {

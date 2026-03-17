@@ -1,5 +1,4 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { EventEmitter } from "node:events";
 import { ThreadId, TurnId, type ProviderRuntimeEvent } from "@t3tools/contracts";
 
 import { GeminiCliServerManager } from "./geminiCliServerManager";
@@ -9,42 +8,6 @@ const asThreadId = (value: string): ThreadId => ThreadId.makeUnsafe(value);
 // ---------------------------------------------------------------------------
 // Helpers to inspect spawned processes
 // ---------------------------------------------------------------------------
-
-/** Minimal mock for ChildProcess returned by `spawn`. */
-function createMockChildProcess() {
-  const stdout = new EventEmitter();
-  const stderr = new EventEmitter();
-  const child = Object.assign(new EventEmitter(), {
-    stdout,
-    stderr,
-    stdin: { write: vi.fn() },
-    kill: vi.fn(),
-    pid: 12345,
-  });
-  return child;
-}
-
-/** Capture spawn calls so we can inspect args & feed fake output. */
-function mockSpawn() {
-  const children: ReturnType<typeof createMockChildProcess>[] = [];
-  const spawnMock = vi.fn((_cmd: string, _args: string[]) => {
-    const child = createMockChildProcess();
-    children.push(child);
-    return child;
-  });
-  vi.doMock("node:child_process", () => ({ spawn: spawnMock }));
-  return { spawnMock, children };
-}
-
-/** Feed a line of JSON to the child's stdout as if it were a readline event. */
-function feedStdoutLine(
-  child: ReturnType<typeof createMockChildProcess>,
-  json: Record<string, unknown>,
-): void {
-  // Simulate readline "line" event by emitting data that includes a newline.
-  // Since we use readline.createInterface on stdout, we emit raw data.
-  child.stdout.emit("data", Buffer.from(JSON.stringify(json) + "\n"));
-}
 
 // ---------------------------------------------------------------------------
 // Unit tests — no real gemini process
@@ -234,7 +197,7 @@ describe("GeminiCliServerManager", () => {
 
         const sessions = manager.listSessions();
         expect(sessions).toHaveLength(2);
-        expect(sessions.map((s) => s.threadId).sort()).toEqual(["thread-1", "thread-2"]);
+        expect(sessions.map((s) => s.threadId).toSorted()).toEqual(["thread-1", "thread-2"]);
       } finally {
         manager.stopAll();
       }
@@ -352,8 +315,8 @@ describe("GeminiCliServerManager JSON event mapping", () => {
     expect(events).toHaveLength(2);
     expect(events[0]?.type).toBe("content.delta");
     expect(events[0]?.provider).toBe("geminiCli");
-    expect((events[0]?.payload as { delta: string }).delta).toBe("Hello, ");
-    expect((events[0]?.payload as { streamKind: string }).streamKind).toBe("assistant_text");
+    expect((events[0]!.payload as { delta: string }).delta).toBe("Hello, ");
+    expect((events[0]!.payload as { streamKind: string }).streamKind).toBe("assistant_text");
 
     // Both deltas must share the same itemId for proper message aggregation.
     expect(events[1]?.type).toBe("content.delta");
@@ -660,7 +623,7 @@ describe.skipIf(!hasGemini || process.env.RUN_GEMINI_LIVE_TESTS !== "1")(
 
         // Turn should be completed successfully.
         const completed = events.find((e) => e.type === "turn.completed");
-        expect((completed?.payload as { state: string }).state).toBe("completed");
+        expect((completed!.payload as { state: string }).state).toBe("completed");
       } finally {
         manager.stopAll();
       }

@@ -114,7 +114,7 @@ export function mergeDiscoveredModels(
     const discoveredBySlug = new Map(dedupedModels.map((m) => [m.slug, m]));
     const merged = (base[provider] ?? []).map((m) => {
       const disc = discoveredBySlug.get(m.slug);
-      return disc ? { ...m, ...disc } : m;
+      return disc ? Object.assign({}, m, disc) : m;
     });
     // Append any discovered models that weren't already in the base list.
     const additions = dedupedModels.filter((m) => !existing.has(m.slug));
@@ -167,11 +167,11 @@ function groupModelsBySubProvider(
 
   const result: GroupedModelEntry[] = sorted.map((id) => {
     const group = groupMap.get(id)!;
-    const sortedModels = [...group.models].sort((a, b) => a.name.localeCompare(b.name));
+    const sortedModels = group.models.toSorted((a, b) => a.name.localeCompare(b.name));
     return { subProvider: group.displayName, models: sortedModels, connected: group.connected };
   });
   if (ungrouped.length > 0) {
-    const sortedUngrouped = [...ungrouped].sort((a, b) => a.name.localeCompare(b.name));
+    const sortedUngrouped = ungrouped.toSorted((a, b) => a.name.localeCompare(b.name));
     result.push({ subProvider: "Other", models: sortedUngrouped, connected: true });
   }
   return result;

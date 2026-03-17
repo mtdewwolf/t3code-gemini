@@ -12,15 +12,7 @@ import {
   TriangleAlertIcon,
   XIcon,
 } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type DragEvent,
-  type MouseEvent,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import {
   DndContext,
   type DragCancelEvent,
@@ -53,10 +45,10 @@ import { useAppSettings } from "../appSettings";
 import { isElectron } from "../env";
 import { APP_STAGE_LABEL, APP_VERSION } from "../branding";
 import { resolveThreadProvider } from "../lib/threadProvider";
-import { isMacPlatform, newCommandId, newProjectId, newThreadId } from "../lib/utils";
+import { formatRelativeTime, isMacPlatform, newCommandId, newProjectId } from "../lib/utils";
 import { useStore } from "../store";
-import { isChatNewLocalShortcut, isChatNewShortcut, shortcutLabelForCommand } from "../keybindings";
-import { useProjectThreadNavigation } from "../hooks/useProjectThreadNavigation";
+import { shortcutLabelForCommand } from "../keybindings";
+
 import { type Thread } from "../types";
 import { derivePendingApprovals, derivePendingUserInputs } from "../session-logic";
 import { gitRemoveWorktreeMutationOptions, gitStatusQueryOptions } from "../lib/gitReactQuery";
@@ -120,16 +112,6 @@ function normalizeThreadTitleSearchQuery(value: string): string {
 function threadTitleMatchesSearch(thread: Thread, query: string): boolean {
   if (query.length === 0) return true;
   return thread.title.toLocaleLowerCase().includes(query);
-}
-
-function formatRelativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
 }
 
 interface TerminalStatusIndicator {

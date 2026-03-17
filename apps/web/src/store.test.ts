@@ -104,22 +104,6 @@ function makeReadModel(thread: OrchestrationReadModel["threads"][number]): Orche
   };
 }
 
-function makeReadModelProject(
-  overrides: Partial<OrchestrationReadModel["projects"][number]>,
-): OrchestrationReadModel["projects"][number] {
-  return {
-    id: ProjectId.makeUnsafe("project-1"),
-    title: "Project",
-    workspaceRoot: "/tmp/project",
-    defaultModel: "gpt-5.3-codex",
-    createdAt: "2026-02-27T00:00:00.000Z",
-    updatedAt: "2026-02-27T00:00:00.000Z",
-    deletedAt: null,
-    scripts: [],
-    ...overrides,
-  };
-}
-
 describe("store pure functions", () => {
   it("markThreadUnread moves lastVisitedAt before completion for a completed thread", () => {
     const latestTurnCompletedAt = "2026-02-25T12:30:00.000Z";

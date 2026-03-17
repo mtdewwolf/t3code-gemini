@@ -53,7 +53,10 @@ import { ClaudeCodeAdapter, type ClaudeCodeAdapterShape } from "../Services/Clau
 import { type EventNdjsonLogger, makeEventNdjsonLogger } from "./EventNdjsonLogger.ts";
 import { toMessage } from "../toMessage.ts";
 
+import { createLogger } from "../../logger";
+
 const PROVIDER = "claudeCode" as const;
+const logger = createLogger(PROVIDER);
 
 /**
  * Environment variables that must be stripped before spawning the Claude Code
@@ -269,16 +272,16 @@ function diagnosticEnvKeys(
 ): ReadonlyArray<string> {
   return Object.keys(env)
     .filter((key) => DESKTOP_DIAGNOSTIC_ENV_PREFIXES.some((prefix) => key.startsWith(prefix)))
-    .sort();
+    .toSorted();
 }
 
 function logDesktopClaudeDiagnostic(message: string, data?: Record<string, unknown>): void {
   if (!isDesktopRuntime()) return;
   if (data) {
-    console.warn("[claudeCode][desktop]", message, data);
+    logger.warn(`[desktop] ${message}`, data);
     return;
   }
-  console.warn("[claudeCode][desktop]", message);
+  logger.warn(`[desktop] ${message}`);
 }
 
 function asRuntimeItemId(value: string): RuntimeItemId {
@@ -848,9 +851,7 @@ function makeClaudeCodeAdapter(options?: ClaudeCodeAdapterLiveOptions) {
                 : {}),
               ...(errorMessage ? { errorMessage } : {}),
             },
-            providerRefs: {
-              ...(fallbackTurnId ? { providerTurnId: String(fallbackTurnId) } : {}),
-            },
+            providerRefs: fallbackTurnId ? { providerTurnId: String(fallbackTurnId) } : {},
           });
 
           const updatedAt = yield* nowIso;
@@ -1762,7 +1763,7 @@ function makeClaudeCodeAdapter(options?: ClaudeCodeAdapterLiveOptions) {
                 stderr: (message: string) => {
                   const trimmed = message.trimEnd();
                   if (trimmed.length > 0) {
-                    console.warn("[claudeCode][stderr]", trimmed);
+                    logger.warn(`[stderr] ${trimmed}`);
                   }
                 },
               }
@@ -1771,7 +1772,7 @@ function makeClaudeCodeAdapter(options?: ClaudeCodeAdapterLiveOptions) {
         };
 
         logDesktopClaudeDiagnostic("starting Claude query", {
-          blockedEnvKeys: [...SPAWN_ENV_BLOCKLIST].sort(),
+          blockedEnvKeys: Array.from(SPAWN_ENV_BLOCKLIST).toSorted(),
           inheritedDiagnosticEnvKeys: diagnosticEnvKeys(process.env),
           forwardedDiagnosticEnvKeys: diagnosticEnvKeys(queryOptions.env ?? {}),
           model: input.model,
