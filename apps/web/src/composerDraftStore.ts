@@ -397,13 +397,23 @@ function normalizeProviderModelOptions(
         }
       : undefined;
 
-  if (!codex && !claude) {
+  // Preserve other provider model options that we don't specifically normalize
+  const otherProviderKeys = ["copilot", "cursor", "opencode", "geminiCli", "amp", "kilo"] as const;
+  const otherOptions: Record<string, unknown> = {};
+  for (const key of otherProviderKeys) {
+    if (candidate?.[key] && typeof candidate[key] === "object") {
+      otherOptions[key] = candidate[key];
+    }
+  }
+
+  if (!codex && !claude && Object.keys(otherOptions).length === 0) {
     return null;
   }
   return {
+    ...otherOptions,
     ...(codex ? { codex } : {}),
     ...(claude ? { claudeAgent: claude } : {}),
-  };
+  } as ProviderModelOptions;
 }
 
 function revokeObjectPreviewUrl(previewUrl: string): void {

@@ -77,10 +77,11 @@ const DEFAULT_RUNTIME_MODE: RuntimeMode = "full-access";
 const WORKTREE_BRANCH_PREFIX = "t3code";
 const TEMP_WORKTREE_BRANCH_PATTERN = new RegExp(`^${WORKTREE_BRANCH_PREFIX}\\/[0-9a-f]{8}$`);
 
-const sameModelOptions = (
+const sameClaudeModelOptions = (
   left: ProviderModelOptions | undefined,
   right: ProviderModelOptions | undefined,
-): boolean => JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+): boolean =>
+  JSON.stringify(left?.claudeAgent ?? null) === JSON.stringify(right?.claudeAgent ?? null);
 
 function isUnknownPendingApprovalRequestError(cause: Cause.Cause<ProviderServiceError>): boolean {
   const error = Cause.squash(cause);
@@ -319,7 +320,7 @@ const make = Effect.gen(function* () {
       const shouldRestartForModelOptionsChange =
         currentProvider === "claudeAgent" &&
         options?.modelOptions !== undefined &&
-        !sameModelOptions(previousModelOptions, options.modelOptions);
+        !sameClaudeModelOptions(previousModelOptions, options.modelOptions);
 
       if (
         !runtimeModeChanged &&
@@ -538,16 +539,19 @@ const make = Effect.gen(function* () {
       interactionMode: event.payload.interactionMode,
       createdAt: event.payload.createdAt,
     }).pipe(
-      Effect.catchCause((cause) =>
-        appendProviderFailureActivity({
+      Effect.catchCause((cause) => {
+        if (Cause.hasInterruptsOnly(cause)) {
+          return Effect.failCause(cause);
+        }
+        return appendProviderFailureActivity({
           threadId: event.payload.threadId,
           kind: "provider.turn.start.failed",
           summary: "Provider turn start failed",
           detail: Cause.pretty(cause),
           turnId: null,
           createdAt: event.payload.createdAt,
-        }),
-      ),
+        });
+      }),
     );
   });
 

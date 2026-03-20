@@ -401,6 +401,19 @@ function migratePersistedAppSettings(value: unknown): unknown {
     settings.providerLogoAppearance = "grayscale";
   }
 
+  // Migrate legacy "claudeCode" key to "claudeAgent" in gitTextGenerationModelByProvider
+  if (
+    settings.gitTextGenerationModelByProvider &&
+    typeof settings.gitTextGenerationModelByProvider === "object" &&
+    !Array.isArray(settings.gitTextGenerationModelByProvider)
+  ) {
+    const overrides = settings.gitTextGenerationModelByProvider as Record<string, unknown>;
+    if ("claudeCode" in overrides && !("claudeAgent" in overrides)) {
+      const { claudeCode, ...rest } = overrides;
+      settings.gitTextGenerationModelByProvider = { ...rest, claudeAgent: claudeCode };
+    }
+  }
+
   return settings;
 }
 

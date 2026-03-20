@@ -429,6 +429,7 @@ export const UserInputQuestion = Schema.Struct({
   question: TrimmedNonEmptyStringSchema,
   options: Schema.Array(UserInputQuestionOption),
   multiSelect: Schema.optional(Schema.Boolean).pipe(
+    Schema.withDecodingDefault(() => false),
     Schema.withConstructorDefault(() => Option.some(false)),
   ),
 });
