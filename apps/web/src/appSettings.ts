@@ -71,63 +71,35 @@ const withDefaults =
     );
 
 export const AppSettingsSchema = Schema.Struct({
-  codexBinaryPath: Schema.String.check(Schema.isMaxLength(4096)).pipe(
-    withDefaults(() => ""),
-  ),
-  codexHomePath: Schema.String.check(Schema.isMaxLength(4096)).pipe(
-    withDefaults(() => ""),
-  ),
-  copilotCliPath: Schema.String.check(Schema.isMaxLength(4096)).pipe(
-    withDefaults(() => ""),
-  ),
-  copilotConfigDir: Schema.String.check(Schema.isMaxLength(4096)).pipe(
-    withDefaults(() => ""),
-  ),
+  codexBinaryPath: Schema.String.check(Schema.isMaxLength(4096)).pipe(withDefaults(() => "")),
+  codexHomePath: Schema.String.check(Schema.isMaxLength(4096)).pipe(withDefaults(() => "")),
+  copilotCliPath: Schema.String.check(Schema.isMaxLength(4096)).pipe(withDefaults(() => "")),
+  copilotConfigDir: Schema.String.check(Schema.isMaxLength(4096)).pipe(withDefaults(() => "")),
   defaultThreadEnvMode: Schema.Literals(["local", "worktree"]).pipe(
     withDefaults(() => "local" as const),
   ),
   confirmThreadDelete: Schema.Boolean.pipe(withDefaults(() => true)),
-  enableAssistantStreaming: Schema.Boolean.pipe(
-    withDefaults(() => false),
-  ),
+  enableAssistantStreaming: Schema.Boolean.pipe(withDefaults(() => false)),
   showCommandOutput: Schema.Boolean.pipe(withDefaults(() => true)),
   showFileChangeDiffs: Schema.Boolean.pipe(withDefaults(() => true)),
   timestampFormat: Schema.Literals(["locale", "12-hour", "24-hour"]).pipe(
     withDefaults(() => DEFAULT_TIMESTAMP_FORMAT),
   ),
-  customCodexModels: Schema.Array(Schema.String).pipe(
-    withDefaults(() => []),
-  ),
-  customCopilotModels: Schema.Array(Schema.String).pipe(
-    withDefaults(() => []),
-  ),
-  customClaudeModels: Schema.Array(Schema.String).pipe(
-    withDefaults(() => []),
-  ),
-  customCursorModels: Schema.Array(Schema.String).pipe(
-    withDefaults(() => []),
-  ),
-  customOpencodeModels: Schema.Array(Schema.String).pipe(
-    withDefaults(() => []),
-  ),
-  customGeminiCliModels: Schema.Array(Schema.String).pipe(
-    withDefaults(() => []),
-  ),
-  customAmpModels: Schema.Array(Schema.String).pipe(
-    withDefaults(() => []),
-  ),
-  customKiloModels: Schema.Array(Schema.String).pipe(
-    withDefaults(() => []),
-  ),
+  customCodexModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
+  customCopilotModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
+  customClaudeModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
+  customCursorModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
+  customOpencodeModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
+  customGeminiCliModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
+  customAmpModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
+  customKiloModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
   gitTextGenerationModelByProvider: Schema.Record(Schema.String, Schema.String).pipe(
     withDefaults(() => ({}) as Record<string, string>),
   ),
   providerLogoAppearance: AppProviderLogoAppearanceSchema.pipe(
     withDefaults(() => "original" as const),
   ),
-  grayscaleProviderLogos: Schema.Boolean.pipe(
-    withDefaults(() => false),
-  ),
+  grayscaleProviderLogos: Schema.Boolean.pipe(withDefaults(() => false)),
   accentColor: Schema.String.check(Schema.isMaxLength(16)).pipe(
     withDefaults(() => DEFAULT_ACCENT_COLOR),
   ),
@@ -139,21 +111,11 @@ export const AppSettingsSchema = Schema.Struct({
       label: Schema.String.check(Schema.isMaxLength(64)),
       value: Schema.String.check(Schema.isMaxLength(16)),
     }),
-  ).pipe(
-    withDefaults(() => [] as ReadonlyArray<{ label: string; value: string }>),
-  ),
-  backgroundColorOverride: Schema.String.check(Schema.isMaxLength(16)).pipe(
-    withDefaults(() => ""),
-  ),
-  foregroundColorOverride: Schema.String.check(Schema.isMaxLength(16)).pipe(
-    withDefaults(() => ""),
-  ),
-  uiFont: Schema.String.check(Schema.isMaxLength(256)).pipe(
-    withDefaults(() => ""),
-  ),
-  codeFont: Schema.String.check(Schema.isMaxLength(256)).pipe(
-    withDefaults(() => ""),
-  ),
+  ).pipe(withDefaults(() => [] as ReadonlyArray<{ label: string; value: string }>)),
+  backgroundColorOverride: Schema.String.check(Schema.isMaxLength(16)).pipe(withDefaults(() => "")),
+  foregroundColorOverride: Schema.String.check(Schema.isMaxLength(16)).pipe(withDefaults(() => "")),
+  uiFont: Schema.String.check(Schema.isMaxLength(256)).pipe(withDefaults(() => "")),
+  codeFont: Schema.String.check(Schema.isMaxLength(256)).pipe(withDefaults(() => "")),
   uiFontSize: Schema.Number.pipe(withDefaults(() => 0)),
   codeFontSize: Schema.Number.pipe(withDefaults(() => 0)),
   contrast: Schema.Number.pipe(withDefaults(() => 0)),
