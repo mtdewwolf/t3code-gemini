@@ -1245,13 +1245,9 @@ export default function ChatView({ threadId }: ChatViewProps) {
   const keybindings = serverConfigQuery.data?.keybindings ?? EMPTY_KEYBINDINGS;
   const availableEditors = serverConfigQuery.data?.availableEditors ?? EMPTY_AVAILABLE_EDITORS;
   const providerStatuses = serverConfigQuery.data?.providers ?? EMPTY_PROVIDER_STATUSES;
-  const activeProvider = resolveProviderHealthBannerProvider({
-    sessionProvider: activeThread?.session?.provider ?? null,
-    selectedProvider,
-  });
   const activeProviderStatus = useMemo(
-    () => providerStatuses.find((status) => status.provider === activeProvider) ?? null,
-    [activeProvider, providerStatuses],
+    () => providerStatuses.find((status) => status.provider === selectedProvider) ?? null,
+    [selectedProvider, providerStatuses],
   );
   const activeProjectCwd = activeProject?.cwd ?? null;
   const activeThreadWorktreePath = activeThread?.worktreePath ?? null;
