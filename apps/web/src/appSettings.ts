@@ -7,6 +7,7 @@ import {
 import { getDefaultModel, getModelOptions, normalizeModelSlug } from "@t3tools/shared/model";
 import { DEFAULT_ACCENT_COLOR, isValidAccentColor, normalizeAccentColor } from "./accentColor";
 import { useLocalStorage } from "./hooks/useLocalStorage";
+import { EnvMode } from "./components/BranchToolbar.logic";
 
 const APP_SETTINGS_STORAGE_KEY = "t3code:app-settings:v1";
 const MAX_CUSTOM_MODEL_COUNT = 32;
@@ -34,6 +35,7 @@ const AppProviderLogoAppearanceSchema = Schema.Literals(["original", "grayscale"
 export const TIMESTAMP_FORMAT_OPTIONS = ["locale", "12-hour", "24-hour"] as const;
 export type TimestampFormat = (typeof TIMESTAMP_FORMAT_OPTIONS)[number];
 export const DEFAULT_TIMESTAMP_FORMAT: TimestampFormat = "locale";
+
 const BUILT_IN_MODEL_SLUGS_BY_PROVIDER: Record<ProviderKind, ReadonlySet<string>> = {
   codex: new Set(getModelOptions("codex").map((option) => option.slug)),
   copilot: new Set(getModelOptions("copilot").map((option) => option.slug)),
@@ -55,7 +57,7 @@ const PROVIDER_KINDS = [
   "kilo",
 ] as const satisfies readonly ProviderKind[];
 
-const AppSettingsSchema = Schema.Struct({
+export const AppSettingsSchema = Schema.Struct({
   codexBinaryPath: Schema.String.check(Schema.isMaxLength(4096)).pipe(
     Schema.withConstructorDefault(() => Option.some("")),
   ),
@@ -468,10 +470,7 @@ export function useAppSettings() {
 
   const updateSettings = useCallback(
     (patch: Partial<AppSettings>) => {
-      setSettings((prev) => ({
-        ...prev,
-        ...patch,
-      }));
+      setSettings((prev) => normalizeAppSettings({ ...prev, ...patch }));
     },
     [setSettings],
   );

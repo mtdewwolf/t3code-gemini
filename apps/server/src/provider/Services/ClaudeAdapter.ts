@@ -1,5 +1,5 @@
 /**
- * ClaudeAdapter - Claude Code implementation of the generic provider adapter contract.
+ * ClaudeAdapter - Claude Agent implementation of the generic provider adapter contract.
  *
  * This service owns Claude runtime/session semantics and emits canonical
  * provider runtime events. It does not perform cross-provider routing, shared
@@ -16,16 +16,15 @@ import type { ProviderAdapterError } from "../Errors.ts";
 import type { ProviderAdapterShape } from "./ProviderAdapter.ts";
 
 /**
- * ClaudeAdapterShape - Service API for the Claude Code provider adapter.
+ * ClaudeAdapterShape - Service API for the Claude Agent provider adapter.
  */
 export interface ClaudeAdapterShape extends ProviderAdapterShape<ProviderAdapterError> {
   readonly provider: "claudeAgent";
 }
 
 /**
- * ClaudeAdapter - Service tag for Claude Code provider adapter operations.
+ * ClaudeAdapter - Service tag for Claude Agent provider adapter operations.
  */
-export class ClaudeAdapter extends ServiceMap.Service<
-  ClaudeAdapter,
-  ClaudeAdapterShape
->()("t3/provider/Services/ClaudeAdapter") {}
+export class ClaudeAdapter extends ServiceMap.Service<ClaudeAdapter, ClaudeAdapterShape>()(
+  "t3/provider/Services/ClaudeAdapter",
+) {}

@@ -69,7 +69,10 @@ const claudeLayer = makeClaudeAdapterLive({
       setMaxThinkingTokens: async () => undefined,
       close: () => undefined,
     }) as never,
-});
+}).pipe(
+  Layer.provideMerge(ServerConfig.layerTest(process.cwd(), process.cwd())),
+  Layer.provideMerge(NodeServices.layer),
+);
 
 const cursorLayer = makeCursorAdapterLive({
   createProcess: () => ({}) as never,

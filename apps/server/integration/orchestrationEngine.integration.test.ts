@@ -5,9 +5,11 @@ import {
   ApprovalRequestId,
   CommandId,
   DEFAULT_PROVIDER_INTERACTION_MODE,
+  DEFAULT_MODEL_BY_PROVIDER,
   EventId,
   MessageId,
   ProjectId,
+  ProviderKind,
   ThreadId,
 } from "@t3tools/contracts";
 import { assert, it } from "@effect/vitest";
@@ -36,7 +38,7 @@ const PROJECT_ID = asProjectId("project-1");
 const THREAD_ID = ThreadId.makeUnsafe("thread-1");
 const FIXTURE_TURN_ID = "fixture-turn";
 const APPROVAL_REQUEST_ID = asApprovalRequestId("req-approval-1");
-type IntegrationProvider = "codex" | "claudeAgent";
+type IntegrationProvider = ProviderKind;
 
 function nowIso() {
   return new Date().toISOString();
@@ -105,6 +107,8 @@ function withRealCodexHarness<A, E>(
 const seedProjectAndThread = (harness: OrchestrationIntegrationHarness) =>
   Effect.gen(function* () {
     const createdAt = nowIso();
+    const provider = harness.adapterHarness?.provider ?? "codex";
+    const defaultModel = DEFAULT_MODEL_BY_PROVIDER[provider];
 
     yield* harness.engine.dispatch({
       type: "project.create",
@@ -112,7 +116,7 @@ const seedProjectAndThread = (harness: OrchestrationIntegrationHarness) =>
       projectId: PROJECT_ID,
       title: "Integration Project",
       workspaceRoot: harness.workspaceDir,
-      defaultModel: "gpt-5-codex",
+      defaultModel,
       createdAt,
     });
 
@@ -122,7 +126,7 @@ const seedProjectAndThread = (harness: OrchestrationIntegrationHarness) =>
       threadId: THREAD_ID,
       projectId: PROJECT_ID,
       title: "Integration Thread",
-      model: "gpt-5-codex",
+      model: defaultModel,
       interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
       runtimeMode: "approval-required",
       branch: null,

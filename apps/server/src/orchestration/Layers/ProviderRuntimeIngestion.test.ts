@@ -4,6 +4,7 @@ import path from "node:path";
 
 import type {
   OrchestrationReadModel,
+  ProviderKind,
   ProviderRuntimeEvent,
   ProviderSession,
 } from "@t3tools/contracts";
@@ -50,15 +51,7 @@ const asTurnId = (value: string): TurnId => TurnId.makeUnsafe(value);
 type LegacyProviderRuntimeEvent = {
   readonly type: string;
   readonly eventId: EventId;
-  readonly provider:
-    | "codex"
-    | "copilot"
-    | "claudeAgent"
-    | "cursor"
-    | "opencode"
-    | "geminiCli"
-    | "amp"
-    | "kilo";
+  readonly provider: ProviderKind;
   readonly createdAt: string;
   readonly threadId: ThreadId;
   readonly turnId?: string | undefined;
@@ -2206,6 +2199,7 @@ describe("ProviderRuntimeIngestion", () => {
       payload: {
         taskId: "turn-task-1",
         description: "Comparing the desktop rollout chunks to the app-server stream.",
+        summary: "Code reviewer is validating the desktop rollout chunks.",
       },
     });
 
@@ -2268,8 +2262,9 @@ describe("ProviderRuntimeIngestion", () => {
     expect(started?.kind).toBe("task.started");
     expect(started?.summary).toBe("Plan task started");
     expect(progress?.kind).toBe("task.progress");
-    expect(progressPayload?.detail).toBe(
-      "Comparing the desktop rollout chunks to the app-server stream.",
+    expect(progressPayload?.detail).toBe("Code reviewer is validating the desktop rollout chunks.");
+    expect(progressPayload?.summary).toBe(
+      "Code reviewer is validating the desktop rollout chunks.",
     );
     expect(completed?.kind).toBe("task.completed");
     expect(completedPayload?.detail).toBe("<proposed_plan>\n# Plan title\n</proposed_plan>");

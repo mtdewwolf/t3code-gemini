@@ -1,6 +1,8 @@
+import { Schema } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  AppSettingsSchema,
   DEFAULT_TIMESTAMP_FORMAT,
   getAppModelOptions,
   getAppSettingsSnapshot,
@@ -201,5 +203,37 @@ describe("getAppSettingsSnapshot", () => {
     );
 
     expect(getAppSettingsSnapshot().providerLogoAppearance).toBe("grayscale");
+  });
+});
+
+describe("provider-specific custom models", () => {
+  it("includes provider-specific custom slugs in non-codex model lists", () => {
+    const claudeOptions = getAppModelOptions("claudeAgent", ["claude/custom-opus"]);
+
+    expect(claudeOptions.some((option) => option.slug === "claude/custom-opus")).toBe(true);
+  });
+});
+
+describe("AppSettingsSchema", () => {
+  it("fills decoding defaults for persisted settings that predate newer keys", () => {
+    const decode = Schema.decodeUnknownSync(Schema.fromJsonString(AppSettingsSchema));
+
+    expect(
+      decode(
+        JSON.stringify({
+          codexBinaryPath: "/usr/local/bin/codex",
+          confirmThreadDelete: false,
+        }),
+      ),
+    ).toMatchObject({
+      codexBinaryPath: "/usr/local/bin/codex",
+      codexHomePath: "",
+      defaultThreadEnvMode: "local",
+      confirmThreadDelete: false,
+      enableAssistantStreaming: false,
+      timestampFormat: DEFAULT_TIMESTAMP_FORMAT,
+      customCodexModels: [],
+      customClaudeModels: [],
+    });
   });
 });

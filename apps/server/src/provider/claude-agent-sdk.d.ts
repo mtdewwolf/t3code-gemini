@@ -17,14 +17,17 @@ declare module "@anthropic-ai/claude-agent-sdk" {
         readonly message?: string;
       };
 
+  export interface CanUseToolCallbackOptions {
+    readonly signal: AbortSignal;
+    readonly toolUseID?: string;
+    readonly suggestions?: ReadonlyArray<PermissionUpdate>;
+    readonly [key: string]: unknown;
+  }
+
   export type CanUseTool = (
     toolName: string,
     toolInput: Record<string, unknown>,
-    callbackOptions: {
-      readonly signal?: AbortSignal;
-      readonly suggestions?: ReadonlyArray<PermissionUpdate>;
-      readonly [key: string]: unknown;
-    },
+    callbackOptions: CanUseToolCallbackOptions,
   ) => Promise<PermissionResult>;
 
   export interface SDKUserMessage {
@@ -50,6 +53,7 @@ declare module "@anthropic-ai/claude-agent-sdk" {
         readonly web_search_requests?: number;
       };
     };
+    readonly modelUsage?: { readonly [key: string]: unknown };
     readonly result?: string;
     readonly session_id?: string;
     readonly [key: string]: unknown;
@@ -79,6 +83,39 @@ declare module "@anthropic-ai/claude-agent-sdk" {
     readonly preceding_tool_use_ids?: ReadonlyArray<string>;
     readonly is_error?: boolean;
     readonly suggestions?: ReadonlyArray<PermissionUpdate>;
+
+    // System message fields
+    readonly status?: string;
+    readonly hook_id?: string;
+    readonly hook_name?: string;
+    readonly hook_event?: string;
+    readonly output?: string;
+    readonly stdout?: string;
+    readonly stderr?: string;
+    readonly outcome?: "error" | "cancelled" | "success";
+    readonly exit_code?: number;
+
+    // Task fields
+    readonly task_id?: string;
+    readonly description?: string;
+    readonly task_type?: string;
+    readonly summary?: string;
+    readonly usage?: { readonly [key: string]: unknown };
+    readonly last_tool_name?: string;
+
+    // File persistence fields
+    readonly files?: ReadonlyArray<{ readonly filename: string; readonly file_id: string }>;
+    readonly failed?: ReadonlyArray<{ readonly filename: string; readonly error: string }>;
+
+    // Tool progress fields
+    readonly elapsed_time_seconds?: number;
+
+    // Auth status fields
+    readonly isAuthenticating?: boolean;
+
+    // Stream event fields
+    readonly event?: Record<string, unknown>;
+
     readonly [key: string]: unknown;
   }
 
@@ -88,6 +125,24 @@ declare module "@anthropic-ai/claude-agent-sdk" {
     | { readonly type: "disabled" };
 
   export type EffortLevel = "low" | "medium" | "high" | "max";
+
+  export interface SpawnOptions {
+    readonly args: string[];
+    readonly env?: Record<string, string | undefined>;
+    readonly cwd?: string;
+    readonly [key: string]: unknown;
+  }
+
+  export interface SpawnedProcess {
+    readonly stdin: NodeJS.WritableStream;
+    readonly stdout: NodeJS.ReadableStream;
+    killed: boolean;
+    exitCode: number | null;
+    kill(signal: NodeJS.Signals): boolean;
+    on(event: "exit" | "error", listener: (...args: unknown[]) => void): void;
+    once(event: "exit" | "error", listener: (...args: unknown[]) => void): void;
+    off(event: "exit" | "error", listener: (...args: unknown[]) => void): void;
+  }
 
   export interface Options {
     readonly cwd?: string;
@@ -102,6 +157,10 @@ declare module "@anthropic-ai/claude-agent-sdk" {
     readonly resume?: string;
     readonly resumeSessionAt?: string;
     readonly includePartialMessages?: boolean;
+    readonly persistSession?: boolean;
+    readonly sessionId?: string;
+    readonly settings?: Record<string, unknown>;
+    readonly spawnClaudeCodeProcess?: (options: SpawnOptions) => SpawnedProcess;
     readonly canUseTool?: CanUseTool;
     readonly env?: Record<string, string | undefined>;
     readonly additionalDirectories?: ReadonlyArray<string>;
@@ -114,6 +173,7 @@ declare module "@anthropic-ai/claude-agent-sdk" {
     readonly setPermissionMode?: (mode: PermissionMode) => Promise<void>;
     readonly setMaxThinkingTokens?: (maxThinkingTokens: number | null) => Promise<void>;
     readonly close?: () => void;
+    readonly initializationResult?: () => Promise<Record<string, unknown>>;
   };
 
   export function query(input: {

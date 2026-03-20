@@ -6,9 +6,9 @@ export type CursorReasoningOption = (typeof CURSOR_REASONING_OPTIONS)[number];
 
 export const CODEX_REASONING_EFFORT_OPTIONS = ["xhigh", "high", "medium", "low"] as const;
 export type CodexReasoningEffort = (typeof CODEX_REASONING_EFFORT_OPTIONS)[number];
-
-export const CLAUDE_CODE_EFFORT_OPTIONS = ["low", "medium", "high", "max"] as const;
+export const CLAUDE_CODE_EFFORT_OPTIONS = ["low", "medium", "high", "max", "ultrathink"] as const;
 export type ClaudeCodeEffort = (typeof CLAUDE_CODE_EFFORT_OPTIONS)[number];
+export type ProviderReasoningEffort = CodexReasoningEffort | ClaudeCodeEffort;
 
 export const CodexModelOptions = Schema.Struct({
   reasoningEffort: Schema.optional(Schema.Literals(CODEX_REASONING_EFFORT_OPTIONS)),
@@ -33,6 +33,7 @@ export type OpencodeModelOptions = typeof OpencodeModelOptions.Type;
 export const ClaudeModelOptions = Schema.Struct({
   thinking: Schema.optional(Schema.Boolean),
   effort: Schema.optional(Schema.Literals(CLAUDE_CODE_EFFORT_OPTIONS)),
+  fastMode: Schema.optional(Schema.Boolean),
 });
 export type ClaudeModelOptions = typeof ClaudeModelOptions.Type;
 
@@ -216,11 +217,11 @@ export const MODEL_OPTIONS_BY_PROVIDER = {
 } as const satisfies Record<ProviderKind, readonly ModelOption[]>;
 export type ModelOptionsByProvider = typeof MODEL_OPTIONS_BY_PROVIDER;
 
-type BuiltInModelSlug = ModelOptionsByProvider[ProviderKind][number]["slug"];
+type BuiltInModelSlug = (typeof MODEL_OPTIONS_BY_PROVIDER)[ProviderKind][number]["slug"];
 export type ModelSlug = BuiltInModelSlug | (string & {});
 export type CursorModelSlug = (typeof MODEL_OPTIONS_BY_PROVIDER)["cursor"][number]["slug"];
 
-export const DEFAULT_MODEL_BY_PROVIDER = {
+export const DEFAULT_MODEL_BY_PROVIDER: Record<ProviderKind, ModelSlug> = {
   codex: "gpt-5.4",
   copilot: "claude-sonnet-4.6",
   claudeAgent: "claude-sonnet-4-6",
@@ -234,6 +235,7 @@ export const DEFAULT_MODEL_BY_PROVIDER = {
 // Backward compatibility for existing Codex-only call sites.
 export const MODEL_OPTIONS = MODEL_OPTIONS_BY_PROVIDER.codex;
 export const DEFAULT_MODEL = DEFAULT_MODEL_BY_PROVIDER.codex;
+export const DEFAULT_GIT_TEXT_GENERATION_MODEL = "gpt-5.4-mini" as const;
 export const DEFAULT_GIT_TEXT_GENERATION_MODEL_BY_PROVIDER = {
   ...DEFAULT_MODEL_BY_PROVIDER,
   codex: "gpt-5.4-mini",
@@ -326,24 +328,24 @@ export const MODEL_SLUG_ALIASES_BY_PROVIDER: Record<ProviderKind, Record<string,
 export const REASONING_EFFORT_OPTIONS_BY_PROVIDER = {
   codex: CODEX_REASONING_EFFORT_OPTIONS,
   copilot: [],
-  claudeAgent: [],
+  claudeAgent: CLAUDE_CODE_EFFORT_OPTIONS,
   cursor: [],
   opencode: [],
   kilo: [],
   geminiCli: [],
   amp: [],
-} as const satisfies Record<ProviderKind, readonly CodexReasoningEffort[]>;
+} as const satisfies Record<ProviderKind, readonly ProviderReasoningEffort[]>;
 
 export const DEFAULT_REASONING_EFFORT_BY_PROVIDER = {
   codex: "high",
   copilot: null,
-  claudeAgent: null,
+  claudeAgent: "high",
   cursor: null,
   opencode: null,
   kilo: null,
   geminiCli: null,
   amp: null,
-} as const satisfies Record<ProviderKind, CodexReasoningEffort | null>;
+} as const satisfies Record<ProviderKind, ProviderReasoningEffort | null>;
 
 export const CLAUDE_CODE_EFFORT_OPTIONS_BY_PROVIDER = {
   codex: [],

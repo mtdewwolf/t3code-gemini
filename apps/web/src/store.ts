@@ -6,7 +6,11 @@ import {
   type OrchestrationReadModel,
   type OrchestrationSessionStatus,
 } from "@t3tools/contracts";
-import { resolveModelSlug, resolveModelSlugForProvider } from "@t3tools/shared/model";
+import {
+  inferProviderForModel,
+  resolveModelSlug,
+  resolveModelSlugForProvider,
+} from "@t3tools/shared/model";
 import { create } from "zustand";
 import { inferProviderForThreadModel, toProviderKind } from "./lib/threadProvider";
 import { type ChatMessage, type Project, type Thread } from "./types";

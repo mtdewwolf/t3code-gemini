@@ -5,7 +5,7 @@ import {
   resolveCursorPickerModelSlug,
 } from "@t3tools/shared/model";
 import { memo, useState } from "react";
-import { PROVIDER_OPTIONS } from "../../session-logic";
+import { PROVIDER_OPTIONS, type ProviderPickerKind } from "../../session-logic";
 import { ChevronDownIcon } from "lucide-react";
 import { Button } from "../ui/button";
 import {
@@ -177,6 +177,14 @@ function groupModelsBySubProvider(
   return result;
 }
 
+function isAvailableProviderOption(option: (typeof PROVIDER_OPTIONS)[number]): option is {
+  value: ProviderKind;
+  label: string;
+  available: true;
+} {
+  return option.available;
+}
+
 function resolveModelForProviderPicker(
   provider: ProviderKind,
   value: string,
@@ -234,21 +242,42 @@ export const AVAILABLE_PROVIDER_OPTIONS = PROVIDER_OPTIONS.filter((option) => op
 const UNAVAILABLE_PROVIDER_OPTIONS = PROVIDER_OPTIONS.filter((option) => !option.available);
 const COMING_SOON_PROVIDER_OPTIONS: ReadonlyArray<{ id: string; label: string; icon: Icon }> = [];
 
+function providerIconClassName(
+  provider: ProviderKind | ProviderPickerKind,
+  fallbackClassName: string,
+): string {
+  return provider === "claudeAgent" ? "text-[#d97757]" : fallbackClassName;
+}
+
 export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
   provider: ProviderKind;
   model: ModelSlug;
   lockedProvider: ProviderKind | null;
   modelOptionsByProvider: Record<ProviderKind, ReadonlyArray<ModelOptionEntry>>;
+  ultrathinkActive?: boolean;
   compact?: boolean;
   disabled?: boolean;
   onProviderModelChange: (provider: ProviderKind, model: ModelSlug) => void;
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const selectedProviderOptions = props.modelOptionsByProvider[props.provider];
+  const activeProvider = props.lockedProvider ?? props.provider;
+  const selectedProviderOptions = props.modelOptionsByProvider[activeProvider];
   const selectedModelOption = selectedProviderOptions.find((option) => option.slug === props.model);
   const selectedModelLabel = selectedModelOption?.name ?? props.model;
   const selectedPricingTier = selectedModelOption?.pricingTier;
-  const ProviderIcon = PROVIDER_ICON_BY_PROVIDER[props.provider];
+  const ProviderIcon = PROVIDER_ICON_BY_PROVIDER[activeProvider];
+  const handleModelChange = (provider: ProviderKind, value: string) => {
+    if (props.disabled) return;
+    if (!value) return;
+    const resolvedModel = resolveModelForProviderPicker(
+      provider,
+      value,
+      props.modelOptionsByProvider[provider],
+    );
+    if (!resolvedModel) return;
+    props.onProviderModelChange(provider, resolvedModel);
+    setIsMenuOpen(false);
+  };
 
   return (
     <Menu
@@ -284,7 +313,10 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
             aria-hidden="true"
             className={cn(
               "size-4 shrink-0",
-              props.provider === "claudeAgent" ? "" : "text-muted-foreground/70",
+              providerIconClassName(activeProvider, "text-muted-foreground/70"),
+              activeProvider === "claudeAgent" && props.ultrathinkActive
+                ? "ultrathink-chroma"
+                : undefined,
             )}
           />
           <span className="min-w-0 flex-1 truncate">{selectedModelLabel}</span>
@@ -360,7 +392,10 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
                 <MenuSubTrigger disabled={isDisabledByProviderLock}>
                   <OptionIcon
                     aria-hidden="true"
-                    className="size-4 shrink-0 text-muted-foreground/85"
+                    className={cn(
+                      "size-4 shrink-0",
+                      providerIconClassName(option.value, "text-muted-foreground/85"),
+                    )}
                   />
                   {option.label}
                 </MenuSubTrigger>
@@ -400,7 +435,10 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
               <MenuSubTrigger disabled={isDisabledByProviderLock}>
                 <OptionIcon
                   aria-hidden="true"
-                  className="size-4 shrink-0 text-muted-foreground/85"
+                  className={cn(
+                    "size-4 shrink-0",
+                    providerIconClassName(option.value, "text-muted-foreground/85"),
+                  )}
                 />
                 {option.label}
               </MenuSubTrigger>
@@ -441,7 +479,7 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
                 aria-hidden="true"
                 className={cn(
                   "size-4 shrink-0 opacity-80",
-                  option.value === "claudeAgent" ? "" : "text-muted-foreground/85",
+                  providerIconClassName(option.value, "text-muted-foreground/85"),
                 )}
               />
               <span>{option.label}</span>
