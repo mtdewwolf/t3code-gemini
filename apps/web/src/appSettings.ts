@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { Option, Schema } from "effect";
 import {
   DEFAULT_GIT_TEXT_GENERATION_MODEL_BY_PROVIDER,
@@ -7,6 +7,7 @@ import {
 import { getDefaultModel, getModelOptions, normalizeModelSlug } from "@t3tools/shared/model";
 import { DEFAULT_ACCENT_COLOR, isValidAccentColor, normalizeAccentColor } from "./accentColor";
 import { useLocalStorage } from "./hooks/useLocalStorage";
+import { EnvMode } from "./components/BranchToolbar.logic";
 
 const APP_SETTINGS_STORAGE_KEY = "t3code:app-settings:v1";
 const MAX_CUSTOM_MODEL_COUNT = 32;
@@ -34,10 +35,11 @@ const AppProviderLogoAppearanceSchema = Schema.Literals(["original", "grayscale"
 export const TIMESTAMP_FORMAT_OPTIONS = ["locale", "12-hour", "24-hour"] as const;
 export type TimestampFormat = (typeof TIMESTAMP_FORMAT_OPTIONS)[number];
 export const DEFAULT_TIMESTAMP_FORMAT: TimestampFormat = "locale";
+
 const BUILT_IN_MODEL_SLUGS_BY_PROVIDER: Record<ProviderKind, ReadonlySet<string>> = {
   codex: new Set(getModelOptions("codex").map((option) => option.slug)),
   copilot: new Set(getModelOptions("copilot").map((option) => option.slug)),
-  claudeCode: new Set(getModelOptions("claudeCode").map((option) => option.slug)),
+  claudeAgent: new Set(getModelOptions("claudeAgent").map((option) => option.slug)),
   cursor: new Set(getModelOptions("cursor").map((option) => option.slug)),
   opencode: new Set(getModelOptions("opencode").map((option) => option.slug)),
   geminiCli: new Set(getModelOptions("geminiCli").map((option) => option.slug)),
@@ -47,7 +49,7 @@ const BUILT_IN_MODEL_SLUGS_BY_PROVIDER: Record<ProviderKind, ReadonlySet<string>
 const PROVIDER_KINDS = [
   "codex",
   "copilot",
-  "claudeCode",
+  "claudeAgent",
   "cursor",
   "opencode",
   "geminiCli",
@@ -55,96 +57,69 @@ const PROVIDER_KINDS = [
   "kilo",
 ] as const satisfies readonly ProviderKind[];
 
-const AppSettingsSchema = Schema.Struct({
-  codexBinaryPath: Schema.String.check(Schema.isMaxLength(4096)).pipe(
-    Schema.withConstructorDefault(() => Option.some("")),
-  ),
-  codexHomePath: Schema.String.check(Schema.isMaxLength(4096)).pipe(
-    Schema.withConstructorDefault(() => Option.some("")),
-  ),
-  copilotCliPath: Schema.String.check(Schema.isMaxLength(4096)).pipe(
-    Schema.withConstructorDefault(() => Option.some("")),
-  ),
-  copilotConfigDir: Schema.String.check(Schema.isMaxLength(4096)).pipe(
-    Schema.withConstructorDefault(() => Option.some("")),
-  ),
+const withDefaults =
+  <
+    S extends Schema.Top & Schema.WithoutConstructorDefault,
+    D extends S["~type.make.in"] & S["Encoded"],
+  >(
+    fallback: () => D,
+  ) =>
+  (schema: S) =>
+    schema.pipe(
+      Schema.withConstructorDefault(() => Option.some(fallback())),
+      Schema.withDecodingDefault(() => fallback()),
+    );
+
+export const AppSettingsSchema = Schema.Struct({
+  codexBinaryPath: Schema.String.check(Schema.isMaxLength(4096)).pipe(withDefaults(() => "")),
+  codexHomePath: Schema.String.check(Schema.isMaxLength(4096)).pipe(withDefaults(() => "")),
+  copilotCliPath: Schema.String.check(Schema.isMaxLength(4096)).pipe(withDefaults(() => "")),
+  copilotConfigDir: Schema.String.check(Schema.isMaxLength(4096)).pipe(withDefaults(() => "")),
   defaultThreadEnvMode: Schema.Literals(["local", "worktree"]).pipe(
-    Schema.withConstructorDefault(() => Option.some("local")),
+    withDefaults(() => "local" as const),
   ),
-  confirmThreadDelete: Schema.Boolean.pipe(Schema.withConstructorDefault(() => Option.some(true))),
-  enableAssistantStreaming: Schema.Boolean.pipe(
-    Schema.withConstructorDefault(() => Option.some(false)),
-  ),
-  showCommandOutput: Schema.Boolean.pipe(Schema.withConstructorDefault(() => Option.some(true))),
-  showFileChangeDiffs: Schema.Boolean.pipe(Schema.withConstructorDefault(() => Option.some(true))),
+  confirmThreadDelete: Schema.Boolean.pipe(withDefaults(() => true)),
+  enableAssistantStreaming: Schema.Boolean.pipe(withDefaults(() => false)),
+  showCommandOutput: Schema.Boolean.pipe(withDefaults(() => true)),
+  showFileChangeDiffs: Schema.Boolean.pipe(withDefaults(() => true)),
   timestampFormat: Schema.Literals(["locale", "12-hour", "24-hour"]).pipe(
-    Schema.withConstructorDefault(() => Option.some(DEFAULT_TIMESTAMP_FORMAT)),
+    withDefaults(() => DEFAULT_TIMESTAMP_FORMAT),
   ),
-  customCodexModels: Schema.Array(Schema.String).pipe(
-    Schema.withConstructorDefault(() => Option.some([])),
-  ),
-  customCopilotModels: Schema.Array(Schema.String).pipe(
-    Schema.withConstructorDefault(() => Option.some([])),
-  ),
-  customClaudeModels: Schema.Array(Schema.String).pipe(
-    Schema.withConstructorDefault(() => Option.some([])),
-  ),
-  customCursorModels: Schema.Array(Schema.String).pipe(
-    Schema.withConstructorDefault(() => Option.some([])),
-  ),
-  customOpencodeModels: Schema.Array(Schema.String).pipe(
-    Schema.withConstructorDefault(() => Option.some([])),
-  ),
-  customGeminiCliModels: Schema.Array(Schema.String).pipe(
-    Schema.withConstructorDefault(() => Option.some([])),
-  ),
-  customAmpModels: Schema.Array(Schema.String).pipe(
-    Schema.withConstructorDefault(() => Option.some([])),
-  ),
-  customKiloModels: Schema.Array(Schema.String).pipe(
-    Schema.withConstructorDefault(() => Option.some([])),
-  ),
+  customCodexModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
+  customCopilotModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
+  customClaudeModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
+  customCursorModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
+  customOpencodeModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
+  customGeminiCliModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
+  customAmpModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
+  customKiloModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
   gitTextGenerationModelByProvider: Schema.Record(Schema.String, Schema.String).pipe(
-    Schema.withConstructorDefault(() => Option.some({} as Record<string, string>)),
+    withDefaults(() => ({}) as Record<string, string>),
   ),
   providerLogoAppearance: AppProviderLogoAppearanceSchema.pipe(
-    Schema.withConstructorDefault(() => Option.some("original")),
+    withDefaults(() => "original" as const),
   ),
-  grayscaleProviderLogos: Schema.Boolean.pipe(
-    Schema.withConstructorDefault(() => Option.some(false)),
-  ),
+  grayscaleProviderLogos: Schema.Boolean.pipe(withDefaults(() => false)),
   accentColor: Schema.String.check(Schema.isMaxLength(16)).pipe(
-    Schema.withConstructorDefault(() => Option.some(DEFAULT_ACCENT_COLOR)),
+    withDefaults(() => DEFAULT_ACCENT_COLOR),
   ),
   providerAccentColors: Schema.Record(Schema.String, Schema.String).pipe(
-    Schema.withConstructorDefault(() => Option.some({} as Record<string, string>)),
+    withDefaults(() => ({}) as Record<string, string>),
   ),
   customAccentPresets: Schema.Array(
     Schema.Struct({
       label: Schema.String.check(Schema.isMaxLength(64)),
       value: Schema.String.check(Schema.isMaxLength(16)),
     }),
-  ).pipe(
-    Schema.withConstructorDefault(() =>
-      Option.some([] as ReadonlyArray<{ label: string; value: string }>),
-    ),
-  ),
-  backgroundColorOverride: Schema.String.check(Schema.isMaxLength(16)).pipe(
-    Schema.withConstructorDefault(() => Option.some("")),
-  ),
-  foregroundColorOverride: Schema.String.check(Schema.isMaxLength(16)).pipe(
-    Schema.withConstructorDefault(() => Option.some("")),
-  ),
-  uiFont: Schema.String.check(Schema.isMaxLength(256)).pipe(
-    Schema.withConstructorDefault(() => Option.some("")),
-  ),
-  codeFont: Schema.String.check(Schema.isMaxLength(256)).pipe(
-    Schema.withConstructorDefault(() => Option.some("")),
-  ),
-  uiFontSize: Schema.Number.pipe(Schema.withConstructorDefault(() => Option.some(0))),
-  codeFontSize: Schema.Number.pipe(Schema.withConstructorDefault(() => Option.some(0))),
-  contrast: Schema.Number.pipe(Schema.withConstructorDefault(() => Option.some(0))),
-  translucency: Schema.Boolean.pipe(Schema.withConstructorDefault(() => Option.some(false))),
+  ).pipe(withDefaults(() => [] as ReadonlyArray<{ label: string; value: string }>)),
+  backgroundColorOverride: Schema.String.check(Schema.isMaxLength(16)).pipe(withDefaults(() => "")),
+  foregroundColorOverride: Schema.String.check(Schema.isMaxLength(16)).pipe(withDefaults(() => "")),
+  uiFont: Schema.String.check(Schema.isMaxLength(256)).pipe(withDefaults(() => "")),
+  codeFont: Schema.String.check(Schema.isMaxLength(256)).pipe(withDefaults(() => "")),
+  uiFontSize: Schema.Number.pipe(withDefaults(() => 0)),
+  codeFontSize: Schema.Number.pipe(withDefaults(() => 0)),
+  contrast: Schema.Number.pipe(withDefaults(() => 0)),
+  translucency: Schema.Boolean.pipe(withDefaults(() => false)),
 });
 export type AppSettings = typeof AppSettingsSchema.Type;
 export interface AppModelOption {
@@ -216,7 +191,7 @@ export function getCustomModelsForProvider(
   switch (provider) {
     case "copilot":
       return settings.customCopilotModels;
-    case "claudeCode":
+    case "claudeAgent":
       return settings.customClaudeModels;
     case "cursor":
       return settings.customCursorModels;
@@ -238,7 +213,7 @@ export function patchCustomModels(provider: ProviderKind, models: string[]): Par
   switch (provider) {
     case "copilot":
       return { customCopilotModels: models };
-    case "claudeCode":
+    case "claudeAgent":
       return { customClaudeModels: models };
     case "cursor":
       return { customCursorModels: models };
@@ -283,7 +258,7 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
     ...settings,
     customCodexModels: normalizeCustomModelSlugs(settings.customCodexModels, "codex"),
     customCopilotModels: normalizeCustomModelSlugs(settings.customCopilotModels, "copilot"),
-    customClaudeModels: normalizeCustomModelSlugs(settings.customClaudeModels, "claudeCode"),
+    customClaudeModels: normalizeCustomModelSlugs(settings.customClaudeModels, "claudeAgent"),
     customCursorModels: normalizeCustomModelSlugs(settings.customCursorModels, "cursor"),
     customOpencodeModels: normalizeCustomModelSlugs(settings.customOpencodeModels, "opencode"),
     customGeminiCliModels: normalizeCustomModelSlugs(settings.customGeminiCliModels, "geminiCli"),
@@ -426,6 +401,18 @@ function migratePersistedAppSettings(value: unknown): unknown {
     settings.providerLogoAppearance = "grayscale";
   }
 
+  // Migrate legacy "claudeCode" key to "claudeAgent" in record-typed settings
+  for (const key of ["gitTextGenerationModelByProvider", "providerAccentColors"] as const) {
+    const record = settings[key];
+    if (record && typeof record === "object" && !Array.isArray(record)) {
+      const obj = record as Record<string, unknown>;
+      if ("claudeCode" in obj && !("claudeAgent" in obj)) {
+        const { claudeCode, ...rest } = obj;
+        settings[key] = { ...rest, claudeAgent: claudeCode };
+      }
+    }
+  }
+
   return settings;
 }
 
@@ -466,12 +453,28 @@ export function useAppSettings() {
     AppSettingsSchema,
   );
 
+  // Apply legacy key migration that the schema decode path doesn't handle
+  // Migrate legacy "claudeCode" keys to "claudeAgent" in record-typed settings
+  // (e.g. gitTextGenerationModelByProvider.claudeCode, providerAccentColors.claudeCode).
+  const migratedSettings = useMemo(() => {
+    let patched = settings;
+    for (const key of ["gitTextGenerationModelByProvider", "providerAccentColors"] as const) {
+      const val = patched[key];
+      if (val && typeof val === "object" && "claudeCode" in val) {
+        const record = { ...val } as Record<string, string>;
+        if (typeof record.claudeAgent !== "string" && typeof record.claudeCode === "string") {
+          record.claudeAgent = record.claudeCode;
+        }
+        delete record.claudeCode;
+        patched = { ...patched, [key]: record };
+      }
+    }
+    return patched;
+  }, [settings]);
+
   const updateSettings = useCallback(
     (patch: Partial<AppSettings>) => {
-      setSettings((prev) => ({
-        ...prev,
-        ...patch,
-      }));
+      setSettings((prev) => normalizeAppSettings({ ...prev, ...patch }));
     },
     [setSettings],
   );
@@ -481,7 +484,7 @@ export function useAppSettings() {
   }, [setSettings]);
 
   return {
-    settings,
+    settings: migratedSettings,
     updateSettings,
     resetSettings,
     defaults: DEFAULT_APP_SETTINGS,

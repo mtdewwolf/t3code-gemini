@@ -31,7 +31,7 @@ export const ORCHESTRATION_WS_CHANNELS = {
 export const ProviderKind = Schema.Union([
   Schema.Literal("codex"),
   Schema.Literal("copilot"),
-  Schema.Literal("claudeCode"),
+  Schema.Literal("claudeAgent"),
   Schema.Literal("cursor"),
   Schema.Literal("opencode"),
   Schema.Literal("geminiCli"),
@@ -53,6 +53,7 @@ export const ProviderSandboxMode = Schema.Literals([
 ]);
 export type ProviderSandboxMode = typeof ProviderSandboxMode.Type;
 export const DEFAULT_PROVIDER_KIND: ProviderKind = "codex";
+
 export const CodexProviderStartOptions = Schema.Struct({
   binaryPath: Schema.optional(TrimmedNonEmptyString),
   homePath: Schema.optional(TrimmedNonEmptyString),
@@ -65,12 +66,12 @@ export const CopilotProviderStartOptions = Schema.Struct({
 });
 export type CopilotProviderStartOptions = typeof CopilotProviderStartOptions.Type;
 
-export const ClaudeCodeProviderStartOptions = Schema.Struct({
+export const ClaudeProviderStartOptions = Schema.Struct({
   binaryPath: Schema.optional(TrimmedNonEmptyString),
   permissionMode: Schema.optional(TrimmedNonEmptyString),
   maxThinkingTokens: Schema.optional(NonNegativeInt),
 });
-export type ClaudeCodeProviderStartOptions = typeof ClaudeCodeProviderStartOptions.Type;
+export type ClaudeProviderStartOptions = typeof ClaudeProviderStartOptions.Type;
 
 export const CursorProviderStartOptions = Schema.Struct({
   binaryPath: Schema.optional(TrimmedNonEmptyString),
@@ -112,7 +113,7 @@ export type KiloProviderStartOptions = typeof KiloProviderStartOptions.Type;
 export const ProviderStartOptions = Schema.Struct({
   codex: Schema.optional(CodexProviderStartOptions),
   copilot: Schema.optional(CopilotProviderStartOptions),
-  claudeCode: Schema.optional(ClaudeCodeProviderStartOptions),
+  claudeAgent: Schema.optional(ClaudeProviderStartOptions),
   cursor: Schema.optional(CursorProviderStartOptions),
   amp: Schema.optional(AmpProviderStartOptions),
   geminiCli: Schema.optional(GeminiCliProviderStartOptions),
@@ -143,7 +144,7 @@ const KiloProviderStartOptionsRedacted = Schema.Struct({
 export const ProviderStartOptionsRedacted = Schema.Struct({
   codex: Schema.optional(CodexProviderStartOptions),
   copilot: Schema.optional(CopilotProviderStartOptions),
-  claudeCode: Schema.optional(ClaudeCodeProviderStartOptions),
+  claudeAgent: Schema.optional(ClaudeProviderStartOptions),
   cursor: Schema.optional(CursorProviderStartOptions),
   amp: Schema.optional(AmpProviderStartOptions),
   geminiCli: Schema.optional(GeminiCliProviderStartOptions),
@@ -264,10 +265,17 @@ export const OrchestrationProposedPlan = Schema.Struct({
   id: OrchestrationProposedPlanId,
   turnId: Schema.NullOr(TurnId),
   planMarkdown: TrimmedNonEmptyString,
+  implementedAt: Schema.NullOr(IsoDateTime).pipe(Schema.withDecodingDefault(() => null)),
+  implementationThreadId: Schema.NullOr(ThreadId).pipe(Schema.withDecodingDefault(() => null)),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });
 export type OrchestrationProposedPlan = typeof OrchestrationProposedPlan.Type;
+
+const SourceProposedPlanReference = Schema.Struct({
+  threadId: ThreadId,
+  planId: OrchestrationProposedPlanId,
+});
 
 export const OrchestrationSessionStatus = Schema.Literals([
   "idle",
@@ -359,6 +367,7 @@ export const OrchestrationLatestTurn = Schema.Struct({
   completedAt: Schema.NullOr(IsoDateTime),
   assistantMessageId: Schema.NullOr(MessageId),
   usage: Schema.optional(OrchestrationTurnUsage),
+  sourceProposedPlan: Schema.optional(SourceProposedPlanReference),
 });
 export type OrchestrationLatestTurn = typeof OrchestrationLatestTurn.Type;
 
@@ -486,6 +495,7 @@ export const ThreadTurnStartCommand = Schema.Struct({
   interactionMode: ProviderInteractionMode.pipe(
     Schema.withDecodingDefault(() => DEFAULT_PROVIDER_INTERACTION_MODE),
   ),
+  sourceProposedPlan: Schema.optional(SourceProposedPlanReference),
   createdAt: IsoDateTime,
 });
 
@@ -506,6 +516,7 @@ const ClientThreadTurnStartCommand = Schema.Struct({
   assistantDeliveryMode: Schema.optional(AssistantDeliveryMode),
   runtimeMode: RuntimeMode,
   interactionMode: ProviderInteractionMode,
+  sourceProposedPlan: Schema.optional(SourceProposedPlanReference),
   createdAt: IsoDateTime,
 });
 
@@ -791,6 +802,7 @@ export const ThreadTurnStartRequestedPayload = Schema.Struct({
   interactionMode: ProviderInteractionMode.pipe(
     Schema.withDecodingDefault(() => DEFAULT_PROVIDER_INTERACTION_MODE),
   ),
+  sourceProposedPlan: Schema.optional(SourceProposedPlanReference),
   createdAt: IsoDateTime,
 });
 

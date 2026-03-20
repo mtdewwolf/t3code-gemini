@@ -6,7 +6,11 @@ import {
   type OrchestrationReadModel,
   type OrchestrationSessionStatus,
 } from "@t3tools/contracts";
-import { resolveModelSlug, resolveModelSlugForProvider } from "@t3tools/shared/model";
+import {
+  inferProviderForModel,
+  resolveModelSlug,
+  resolveModelSlugForProvider,
+} from "@t3tools/shared/model";
 import { create } from "zustand";
 import { inferProviderForThreadModel, toProviderKind } from "./lib/threadProvider";
 import { type ChatMessage, type Project, type Thread } from "./types";
@@ -289,6 +293,8 @@ function normalizeProposedPlan(
     id: proposedPlan.id,
     turnId: proposedPlan.turnId,
     planMarkdown: proposedPlan.planMarkdown,
+    implementedAt: proposedPlan.implementedAt,
+    implementationThreadId: proposedPlan.implementationThreadId,
     createdAt: proposedPlan.createdAt,
     updatedAt: proposedPlan.updatedAt,
   };
@@ -297,6 +303,8 @@ function normalizeProposedPlan(
     existing.id === normalized.id &&
     existing.turnId === normalized.turnId &&
     existing.planMarkdown === normalized.planMarkdown &&
+    existing.implementedAt === normalized.implementedAt &&
+    existing.implementationThreadId === normalized.implementationThreadId &&
     existing.createdAt === normalized.createdAt &&
     existing.updatedAt === normalized.updatedAt
   ) {

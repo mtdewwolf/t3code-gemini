@@ -4,6 +4,7 @@ import {
   CommandId,
   MessageId,
   type OrchestrationEvent,
+  type OrchestrationProposedPlanId,
   CheckpointRef,
   isToolLifecycleItemType,
   ThreadId,
@@ -15,6 +16,8 @@ import { Cache, Cause, Duration, Effect, Layer, Option, Ref, Stream } from "effe
 import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
 
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
+import { ProjectionTurnRepository } from "../../persistence/Services/ProjectionTurns.ts";
+import { ProjectionTurnRepositoryLive } from "../../persistence/Layers/ProjectionTurns.ts";
 import { resolveThreadWorkspaceCwd } from "../../checkpointing/Utils.ts";
 import { isGitRepository } from "../../git/isRepo.ts";
 import { OrchestrationEngineService } from "../Services/OrchestrationEngine.ts";
@@ -403,7 +406,8 @@ function runtimeEventToActivities(
           summary: "Reasoning update",
           payload: {
             taskId: event.payload.taskId,
-            detail: truncateDetail(event.payload.description),
+            detail: truncateDetail(event.payload.summary ?? event.payload.description),
+            ...(event.payload.summary ? { summary: truncateDetail(event.payload.summary) } : {}),
             ...(event.payload.lastToolName ? { lastToolName: event.payload.lastToolName } : {}),
             ...(event.payload.usage !== undefined ? { usage: event.payload.usage } : {}),
           },
@@ -513,6 +517,7 @@ function runtimeEventToActivities(
 const make = Effect.gen(function* () {
   const orchestrationEngine = yield* OrchestrationEngineService;
   const providerService = yield* ProviderService;
+  const projectionTurnRepository = yield* ProjectionTurnRepository;
 
   const assistantDeliveryModeRef = yield* Ref.make<AssistantDeliveryMode>(
     DEFAULT_ASSISTANT_DELIVERY_MODE,
@@ -921,6 +926,8 @@ const make = Effect.gen(function* () {
     threadProposedPlans: ReadonlyArray<{
       id: string;
       createdAt: string;
+      implementedAt: string | null;
+      implementationThreadId: ThreadId | null;
     }>;
     planId: string;
     turnId?: TurnId;
@@ -943,6 +950,8 @@ const make = Effect.gen(function* () {
           id: input.planId,
           turnId: input.turnId ?? null,
           planMarkdown,
+          implementedAt: existingPlan?.implementedAt ?? null,
+          implementationThreadId: existingPlan?.implementationThreadId ?? null,
           createdAt: existingPlan?.createdAt ?? input.createdAt,
           updatedAt: input.updatedAt,
         },
@@ -956,6 +965,8 @@ const make = Effect.gen(function* () {
     threadProposedPlans: ReadonlyArray<{
       id: string;
       createdAt: string;
+      implementedAt: string | null;
+      implementationThreadId: ThreadId | null;
     }>;
     planId: string;
     turnId?: TurnId;
@@ -1027,6 +1038,79 @@ const make = Effect.gen(function* () {
   // providers like Copilot and Amp (which emit usage separately from
   // turn.completed) still get turn-level usage in the completion summary.
   const pendingTokenUsageByThread = new Map<string, Record<string, unknown>>();
+
+  const getSourceProposedPlanReferenceForPendingTurnStart = Effect.fnUntraced(function* (
+    threadId: ThreadId,
+  ) {
+    const pendingTurnStart = yield* projectionTurnRepository.getPendingTurnStartByThreadId({
+      threadId,
+    });
+    if (Option.isNone(pendingTurnStart)) {
+      return null;
+    }
+
+    const sourceThreadId = pendingTurnStart.value.sourceProposedPlanThreadId;
+    const sourcePlanId = pendingTurnStart.value.sourceProposedPlanId;
+    if (sourceThreadId === null || sourcePlanId === null) {
+      return null;
+    }
+
+    return {
+      sourceThreadId,
+      sourcePlanId,
+    } as const;
+  });
+
+  const getExpectedProviderTurnIdForThread = Effect.fnUntraced(function* (threadId: ThreadId) {
+    const sessions = yield* providerService.listSessions();
+    const session = sessions.find((entry) => entry.threadId === threadId);
+    return session?.activeTurnId;
+  });
+
+  const getSourceProposedPlanReferenceForAcceptedTurnStart = Effect.fnUntraced(function* (
+    threadId: ThreadId,
+    eventTurnId: TurnId | undefined,
+  ) {
+    if (eventTurnId === undefined) {
+      return null;
+    }
+
+    const expectedTurnId = yield* getExpectedProviderTurnIdForThread(threadId);
+    if (!sameId(expectedTurnId, eventTurnId)) {
+      return null;
+    }
+
+    return yield* getSourceProposedPlanReferenceForPendingTurnStart(threadId);
+  });
+
+  const markSourceProposedPlanImplemented = Effect.fnUntraced(function* (
+    sourceThreadId: ThreadId,
+    sourcePlanId: OrchestrationProposedPlanId,
+    implementationThreadId: ThreadId,
+    implementedAt: string,
+  ) {
+    const readModel = yield* orchestrationEngine.getReadModel();
+    const sourceThread = readModel.threads.find((entry) => entry.id === sourceThreadId);
+    const sourcePlan = sourceThread?.proposedPlans.find((entry) => entry.id === sourcePlanId);
+    if (!sourceThread || !sourcePlan || sourcePlan.implementedAt !== null) {
+      return;
+    }
+
+    yield* orchestrationEngine.dispatch({
+      type: "thread.proposed-plan.upsert",
+      commandId: CommandId.makeUnsafe(
+        `provider:source-proposed-plan-implemented:${implementationThreadId}:${crypto.randomUUID()}`,
+      ),
+      threadId: sourceThread.id,
+      proposedPlan: {
+        ...sourcePlan,
+        implementedAt,
+        implementationThreadId,
+        updatedAt: implementedAt,
+      },
+      createdAt: implementedAt,
+    });
+  });
 
   const processRuntimeEvent = (event: ProviderRuntimeEvent) =>
     Effect.gen(function* () {
@@ -1104,6 +1188,10 @@ const make = Effect.gen(function* () {
             return true;
         }
       })();
+      const acceptedTurnStartedSourcePlan =
+        event.type === "turn.started" && shouldApplyThreadLifecycle
+          ? yield* getSourceProposedPlanReferenceForAcceptedTurnStart(thread.id, eventTurnId)
+          : null;
 
       if (
         event.type === "session.started" ||
@@ -1170,6 +1258,26 @@ const make = Effect.gen(function* () {
           }
           if (event.type === "turn.completed" || event.type === "turn.aborted") {
             pendingTokenUsageByThread.delete(event.threadId);
+          }
+
+          if (event.type === "turn.started" && acceptedTurnStartedSourcePlan !== null) {
+            yield* markSourceProposedPlanImplemented(
+              acceptedTurnStartedSourcePlan.sourceThreadId,
+              acceptedTurnStartedSourcePlan.sourcePlanId,
+              thread.id,
+              now,
+            ).pipe(
+              Effect.catchCause((cause) =>
+                Effect.logWarning(
+                  "provider runtime ingestion failed to mark source proposed plan",
+                  {
+                    eventId: event.eventId,
+                    eventType: event.type,
+                    cause: Cause.pretty(cause),
+                  },
+                ),
+              ),
+            );
           }
 
           yield* orchestrationEngine.dispatch({
@@ -1520,4 +1628,7 @@ const make = Effect.gen(function* () {
   } satisfies ProviderRuntimeIngestionShape;
 });
 
-export const ProviderRuntimeIngestionLive = Layer.effect(ProviderRuntimeIngestionService, make);
+export const ProviderRuntimeIngestionLive = Layer.effect(
+  ProviderRuntimeIngestionService,
+  make,
+).pipe(Layer.provide(ProjectionTurnRepositoryLive));

@@ -7,7 +7,7 @@ import { AmpServerManager } from "../../ampServerManager.ts";
 import { GeminiCliServerManager } from "../../geminiCliServerManager.ts";
 import { ServerConfig } from "../../config.ts";
 import { makeAmpAdapterLive } from "./AmpAdapter.ts";
-import { makeClaudeCodeAdapterLive } from "./ClaudeCodeAdapter.ts";
+import { makeClaudeAdapterLive } from "./ClaudeAdapter.ts";
 import { makeCodexAdapterLive } from "./CodexAdapter.ts";
 import { makeCopilotAdapterLive } from "./CopilotAdapter.ts";
 import { makeCursorAdapterLive } from "./CursorAdapter.ts";
@@ -18,7 +18,7 @@ import {
   validateProviderAdapterConformance,
 } from "../Services/ProviderAdapter.ts";
 import { AmpAdapter } from "../Services/AmpAdapter.ts";
-import { ClaudeCodeAdapter } from "../Services/ClaudeCodeAdapter.ts";
+import { ClaudeAdapter } from "../Services/ClaudeAdapter.ts";
 import { CodexAdapter } from "../Services/CodexAdapter.ts";
 import { CopilotAdapter } from "../Services/CopilotAdapter.ts";
 import { CursorAdapter } from "../Services/CursorAdapter.ts";
@@ -57,7 +57,7 @@ const copilotLayer = makeCopilotAdapterLive({
   Layer.provideMerge(NodeServices.layer),
 );
 
-const claudeLayer = makeClaudeCodeAdapterLive({
+const claudeLayer = makeClaudeAdapterLive({
   createQuery: () =>
     ({
       [Symbol.asyncIterator]: async function* () {
@@ -69,7 +69,10 @@ const claudeLayer = makeClaudeCodeAdapterLive({
       setMaxThinkingTokens: async () => undefined,
       close: () => undefined,
     }) as never,
-});
+}).pipe(
+  Layer.provideMerge(ServerConfig.layerTest(process.cwd(), process.cwd())),
+  Layer.provideMerge(NodeServices.layer),
+);
 
 const cursorLayer = makeCursorAdapterLive({
   createProcess: () => ({}) as never,
@@ -104,11 +107,11 @@ describe("provider adapter conformance", () => {
         ),
     },
     {
-      provider: "claudeCode" as const,
+      provider: "claudeAgent" as const,
       load: () =>
         Effect.runPromise(
           Effect.gen(function* () {
-            return yield* ClaudeCodeAdapter;
+            return yield* ClaudeAdapter;
           }).pipe(Effect.provide(claudeLayer)),
         ),
     },
