@@ -206,7 +206,8 @@ async function readFirstPromptText(
   if (next.done) {
     return undefined;
   }
-  const content = (next.value.message as { content?: Array<{ type?: string; text?: string }> })?.content?.[0];
+  const content = (next.value.message as { content?: Array<{ type?: string; text?: string }> })
+    ?.content?.[0];
   if (!content || content.type !== "text") {
     return undefined;
   }

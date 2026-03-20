@@ -63,7 +63,6 @@ describe("ProviderSessionStartInput", () => {
     expect(parsed.runtimeMode).toBe("full-access");
   });
 
-
   it("accepts claude runtime knobs", () => {
     const parsed = decodeProviderSessionStartInput({
       threadId: "thread-1",

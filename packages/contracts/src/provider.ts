@@ -49,7 +49,6 @@ export type ProviderSession = typeof ProviderSession.Type;
 
 export { ProviderStartOptions };
 
-
 export const ProviderSessionStartInput = Schema.Struct({
   threadId: ThreadId,
   provider: Schema.optional(ProviderKind),
