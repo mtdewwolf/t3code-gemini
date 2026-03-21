@@ -47,16 +47,13 @@ export function useHandleNewThread() {
     ): Promise<void> => {
       const {
         clearProjectDraftThreadId,
-        draftsByThreadId,
         getDraftThread,
         getDraftThreadByProjectId,
         setModel,
         setModelOptions,
         setProvider,
         setDraftThreadContext,
-        setModel: setDraftModel,
         setProjectDraftThreadId,
-        setProvider: setDraftProvider,
       } = useComposerDraftStore.getState();
       const hasBranchOption = options?.branch !== undefined;
       const hasWorktreePathOption = options?.worktreePath !== undefined;
@@ -113,6 +110,7 @@ export function useHandleNewThread() {
           envMode: options?.envMode ?? "local",
           runtimeMode: DEFAULT_RUNTIME_MODE,
         });
+        // Apply sticky model/options first, then explicit overrides.
         if (stickyModel) {
           setProvider(threadId, inferProviderForModel(stickyModel));
           setModel(threadId, stickyModel);
@@ -121,22 +119,12 @@ export function useHandleNewThread() {
           setModelOptions(threadId, stickyModelOptions);
         }
 
-        // Seed provider/model from explicit options, or carry over from the
-        // active thread / draft so the user's current provider selection
-        // persists across new-thread creation.
-        const sourceThread = activeThread?.projectId === projectId ? activeThread : undefined;
-        const sameProjectDraft =
-          routeThreadId && latestActiveDraftThread?.projectId === projectId
-            ? draftsByThreadId[routeThreadId]
-            : undefined;
-        const seedProvider =
-          options?.provider ?? sourceThread?.provider ?? sameProjectDraft?.provider ?? null;
-        const seedModel = options?.model ?? sourceThread?.model ?? sameProjectDraft?.model ?? null;
-        if (seedProvider != null) {
-          setDraftProvider(threadId, seedProvider);
+        // Explicit options override sticky settings.
+        if (options?.provider != null) {
+          setProvider(threadId, options.provider);
         }
-        if (seedModel != null) {
-          setDraftModel(threadId, seedModel);
+        if (options?.model != null) {
+          setModel(threadId, options.model);
         }
 
         await navigate({
@@ -145,7 +133,7 @@ export function useHandleNewThread() {
         });
       })();
     },
-    [activeThread, navigate, routeThreadId, stickyModel, stickyModelOptions],
+    [navigate, routeThreadId, stickyModel, stickyModelOptions],
   );
 
   return {
