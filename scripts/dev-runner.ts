@@ -107,7 +107,11 @@ function resolveBaseDir(baseDir: string | undefined): Effect.Effect<string, neve
     const configured = baseDir?.trim();
 
     if (configured) {
-      return path.resolve(configured);
+      const expanded =
+        configured.startsWith("~/") || configured === "~"
+          ? path.join(homedir(), configured.slice(1))
+          : configured;
+      return path.resolve(expanded);
     }
 
     return yield* DEFAULT_T3_HOME;

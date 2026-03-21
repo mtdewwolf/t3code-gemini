@@ -269,7 +269,13 @@ describe("provider-indexed custom model settings", () => {
   it("exports one provider config per provider", () => {
     expect(MODEL_PROVIDER_SETTINGS.map((config) => config.provider)).toEqual([
       "codex",
+      "copilot",
       "claudeAgent",
+      "cursor",
+      "opencode",
+      "geminiCli",
+      "amp",
+      "kilo",
     ]);
   });
 
@@ -311,7 +317,13 @@ describe("provider-indexed custom model settings", () => {
   it("builds a complete provider-indexed custom model record", () => {
     expect(getCustomModelsByProvider(settings)).toEqual({
       codex: ["custom/codex-model"],
+      copilot: [],
       claudeAgent: ["claude/custom-opus"],
+      cursor: [],
+      opencode: [],
+      geminiCli: [],
+      amp: [],
+      kilo: [],
     });
   });
 
