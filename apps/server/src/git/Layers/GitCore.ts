@@ -958,10 +958,10 @@ export const makeGitCore = (options?: { executeOverride?: GitCoreShape["execute"
     const prepareCommitContext: GitCoreShape["prepareCommitContext"] = (cwd, filePaths) =>
       Effect.gen(function* () {
         if (filePaths !== undefined && filePaths !== null) {
+          yield* runGit("GitCore.prepareCommitContext.reset", cwd, ["reset"]).pipe(
+            Effect.catch(() => Effect.void),
+          );
           if (filePaths.length > 0) {
-            yield* runGit("GitCore.prepareCommitContext.reset", cwd, ["reset"]).pipe(
-              Effect.catch(() => Effect.void),
-            );
             yield* runGit("GitCore.prepareCommitContext.addSelected", cwd, [
               "add",
               "-A",
@@ -969,7 +969,7 @@ export const makeGitCore = (options?: { executeOverride?: GitCoreShape["execute"
               ...filePaths,
             ]);
           }
-          // filePaths is an explicit empty array — stage nothing.
+          // filePaths is an explicit empty array — leave the index empty.
         } else {
           yield* runGit("GitCore.prepareCommitContext.addAll", cwd, ["add", "-A"]);
         }
