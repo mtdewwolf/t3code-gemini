@@ -27,6 +27,7 @@ import {
   type OpenCodeSendTurnInput,
   type OpenCodeDiscoveredModel,
   type SharedServerState,
+  type OpencodeAdapterOptions,
 } from "./opencode/types.ts";
 import {
   asRecord,
@@ -115,12 +116,13 @@ export class OpenCodeServerManager extends EventEmitter<OpenCodeManagerEvents> {
       throw new Error("OpenCode session creation did not return a session id");
     }
 
+    const sessionModel = openCodeInput.modelSelection?.model;
     const initialSession: OpenCodeProviderSession = {
       provider: PROVIDER,
       status: "ready",
       runtimeMode: openCodeInput.runtimeMode,
       ...(directory ? { cwd: directory } : {}),
-      ...(openCodeInput.model ? { model: openCodeInput.model } : {}),
+      ...(sessionModel ? { model: sessionModel } : {}),
       threadId: openCodeInput.threadId,
       resumeCursor: {
         sessionId: providerSessionId,
@@ -197,7 +199,7 @@ export class OpenCodeServerManager extends EventEmitter<OpenCodeManagerEvents> {
         config: {
           provider: PROVIDER,
           sessionId: providerSessionId,
-          ...(openCodeInput.model ? { model: openCodeInput.model } : {}),
+          ...(sessionModel ? { model: sessionModel } : {}),
           directory,
           ...(workspace ? { workspace } : {}),
         },
@@ -211,16 +213,18 @@ export class OpenCodeServerManager extends EventEmitter<OpenCodeManagerEvents> {
     const openCodeInput = input as OpenCodeSendTurnInput;
     const context = this.requireSession(input.threadId);
     const turnId = createTurnId();
+    const turnModel = openCodeInput.modelSelection?.model;
+    const opcodeOpts = openCodeInput.modelSelection?.options as OpencodeAdapterOptions | undefined;
     const agent =
-      openCodeInput.modelOptions?.opencode?.agent ??
+      opcodeOpts?.agent ??
       (openCodeInput.interactionMode === "plan" ? "plan" : undefined);
-    const parsedModel = parseOpencodeModel(openCodeInput.model);
-    const providerId = openCodeInput.modelOptions?.opencode?.providerId ?? parsedModel?.providerId;
+    const parsedModel = parseOpencodeModel(turnModel);
+    const providerId = opcodeOpts?.providerId ?? parsedModel?.providerId;
     const modelId =
-      openCodeInput.modelOptions?.opencode?.modelId ?? parsedModel?.modelId ?? openCodeInput.model;
+      opcodeOpts?.modelId ?? parsedModel?.modelId ?? turnModel;
     const variant =
-      openCodeInput.modelOptions?.opencode?.variant ??
-      openCodeInput.modelOptions?.opencode?.reasoningEffort ??
+      opcodeOpts?.variant ??
+      opcodeOpts?.reasoningEffort ??
       parsedModel?.variant;
     const startedAt = nowIso();
 
@@ -229,7 +233,7 @@ export class OpenCodeServerManager extends EventEmitter<OpenCodeManagerEvents> {
     context.session = {
       ...stripTransientSessionFields(context.session),
       status: "running",
-      ...(openCodeInput.model ? { model: openCodeInput.model } : {}),
+      ...(turnModel ? { model: turnModel } : {}),
       activeTurnId: turnId,
       updatedAt: startedAt,
     };
@@ -241,7 +245,7 @@ export class OpenCodeServerManager extends EventEmitter<OpenCodeManagerEvents> {
       threadId: openCodeInput.threadId,
       createdAt: startedAt,
       turnId,
-      payload: openCodeInput.model ? { model: openCodeInput.model } : {},
+      payload: turnModel ? { model: turnModel } : {},
     });
 
     this.emitRuntimeEvent({

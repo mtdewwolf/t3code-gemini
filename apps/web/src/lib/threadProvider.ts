@@ -120,9 +120,9 @@ export function inferProviderForThreadModel(input: {
   return input.model.trim().startsWith("claude-") ? "claudeAgent" : "codex";
 }
 
-export function resolveThreadProvider(thread: Pick<Thread, "model" | "session">): ProviderKind {
+export function resolveThreadProvider(thread: Pick<Thread, "modelSelection" | "session">): ProviderKind {
   return inferProviderForThreadModel({
-    model: thread.model,
+    model: thread.modelSelection.model,
     sessionProviderName: thread.session?.provider ?? null,
   });
 }

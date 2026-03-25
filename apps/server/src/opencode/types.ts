@@ -32,17 +32,15 @@ export type OpenCodeSessionStartInput = ProviderSessionStartInput & {
   };
 };
 
-export type OpenCodeSendTurnInput = ProviderSendTurnInput & {
-  readonly modelOptions?: ProviderSendTurnInput["modelOptions"] & {
-    readonly opencode?: {
-      readonly providerId?: string;
-      readonly modelId?: string;
-      readonly variant?: string;
-      readonly reasoningEffort?: string;
-      readonly agent?: string;
-    };
-  };
+export type OpencodeAdapterOptions = {
+  readonly providerId?: string;
+  readonly modelId?: string;
+  readonly variant?: string;
+  readonly reasoningEffort?: string;
+  readonly agent?: string;
 };
+
+export type OpenCodeSendTurnInput = ProviderSendTurnInput;
 
 // ---------------------------------------------------------------------------
 // Runtime event types

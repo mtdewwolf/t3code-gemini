@@ -16,7 +16,10 @@ function makeThread(overrides: Partial<Thread> = {}): Thread {
     codexThreadId: null,
     projectId: ProjectId.makeUnsafe("project-1"),
     title: "Thread",
-    model: "gpt-5.3-codex",
+    modelSelection: {
+      provider: "codex",
+      model: "gpt-5-codex",
+    },
     runtimeMode: DEFAULT_RUNTIME_MODE,
     interactionMode: DEFAULT_INTERACTION_MODE,
     session: null,
@@ -26,6 +29,7 @@ function makeThread(overrides: Partial<Thread> = {}): Thread {
     proposedPlans: [],
     error: null,
     createdAt: "2026-02-27T00:00:00.000Z",
+    updatedAt: "2026-02-27T00:00:00.000Z",
     latestTurn: null,
     branch: null,
     worktreePath: null,
@@ -40,9 +44,14 @@ function makeState(thread: Thread): AppState {
         id: ProjectId.makeUnsafe("project-1"),
         name: "Project",
         cwd: "/tmp/project",
-        model: "gpt-5-codex",
+        defaultModelSelection: {
+          provider: "codex",
+          model: "gpt-5-codex",
+        },
         expanded: true,
         scripts: [],
+        createdAt: "2026-02-27T00:00:00.000Z",
+        updatedAt: "2026-02-27T00:00:00.000Z",
       },
     ],
     threads: [thread],
@@ -55,7 +64,10 @@ function makeProject(projectId: string, name = projectId) {
     id: ProjectId.makeUnsafe(projectId),
     name,
     cwd: `/tmp/${projectId}`,
-    model: "gpt-5-codex",
+    defaultModelSelection: {
+      provider: "codex" as const,
+      model: DEFAULT_MODEL_BY_PROVIDER.codex,
+    },
     expanded: true,
     scripts: [],
   };
@@ -66,7 +78,10 @@ function makeReadModelThread(overrides: Partial<OrchestrationReadModel["threads"
     id: ThreadId.makeUnsafe("thread-1"),
     projectId: ProjectId.makeUnsafe("project-1"),
     title: "Thread",
-    model: "gpt-5.3-codex",
+    modelSelection: {
+      provider: "codex",
+      model: "gpt-5.3-codex",
+    },
     runtimeMode: DEFAULT_RUNTIME_MODE,
     interactionMode: DEFAULT_INTERACTION_MODE,
     branch: null,
@@ -93,7 +108,10 @@ function makeReadModel(thread: OrchestrationReadModel["threads"][number]): Orche
         id: ProjectId.makeUnsafe("project-1"),
         title: "Project",
         workspaceRoot: "/tmp/project",
-        defaultModel: "gpt-5.3-codex",
+        defaultModelSelection: {
+          provider: "codex",
+          model: "gpt-5.3-codex",
+        },
         createdAt: "2026-02-27T00:00:00.000Z",
         updatedAt: "2026-02-27T00:00:00.000Z",
         deletedAt: null,
@@ -103,6 +121,26 @@ function makeReadModel(thread: OrchestrationReadModel["threads"][number]): Orche
     threads: [thread],
   };
 }
+
+function makeReadModelProject(
+  overrides: Partial<OrchestrationReadModel["projects"][number]>,
+): OrchestrationReadModel["projects"][number] {
+  return {
+    id: ProjectId.makeUnsafe("project-1"),
+    title: "Project",
+    workspaceRoot: "/tmp/project",
+    defaultModelSelection: {
+      provider: "codex",
+      model: "gpt-5.3-codex",
+    },
+    createdAt: "2026-02-27T00:00:00.000Z",
+    updatedAt: "2026-02-27T00:00:00.000Z",
+    deletedAt: null,
+    scripts: [],
+    ...overrides,
+  };
+}
+
 
 describe("store pure functions", () => {
   it("markThreadUnread moves lastVisitedAt before completion for a completed thread", () => {
@@ -154,7 +192,10 @@ describe("store pure functions", () => {
           id: project1,
           name: "Project 1",
           cwd: "/tmp/project-1",
-          model: DEFAULT_MODEL_BY_PROVIDER.codex,
+          defaultModelSelection: {
+            provider: "codex",
+            model: DEFAULT_MODEL_BY_PROVIDER.codex,
+          },
           expanded: true,
           scripts: [],
         },
@@ -162,7 +203,10 @@ describe("store pure functions", () => {
           id: project2,
           name: "Project 2",
           cwd: "/tmp/project-2",
-          model: DEFAULT_MODEL_BY_PROVIDER.codex,
+          defaultModelSelection: {
+            provider: "codex",
+            model: DEFAULT_MODEL_BY_PROVIDER.codex,
+          },
           expanded: true,
           scripts: [],
         },
@@ -170,7 +214,10 @@ describe("store pure functions", () => {
           id: project3,
           name: "Project 3",
           cwd: "/tmp/project-3",
-          model: DEFAULT_MODEL_BY_PROVIDER.codex,
+          defaultModelSelection: {
+            provider: "codex",
+            model: DEFAULT_MODEL_BY_PROVIDER.codex,
+          },
           expanded: true,
           scripts: [],
         },
@@ -190,20 +237,26 @@ describe("store read model sync", () => {
     const initialState = makeState(makeThread());
     const readModel = makeReadModel(
       makeReadModelThread({
-        model: "claude-opus-4-6",
+        modelSelection: {
+          provider: "claudeAgent",
+          model: "claude-opus-4-6",
+        },
       }),
     );
 
     const next = syncServerReadModel(initialState, readModel);
 
-    expect(next.threads[0]?.model).toBe("claude-opus-4-6");
+    expect(next.threads[0]?.modelSelection.model).toBe("claude-opus-4-6");
   });
 
   it("resolves claude aliases when session provider is claudeAgent", () => {
     const initialState = makeState(makeThread());
     const readModel = makeReadModel(
       makeReadModelThread({
-        model: "sonnet",
+        modelSelection: {
+          provider: "claudeAgent",
+          model: "sonnet",
+        },
         session: {
           threadId: ThreadId.makeUnsafe("thread-1"),
           status: "ready",
@@ -218,14 +271,31 @@ describe("store read model sync", () => {
 
     const next = syncServerReadModel(initialState, readModel);
 
-    expect(next.threads[0]?.model).toBe("claude-sonnet-4-6");
+    expect(next.threads[0]?.modelSelection.model).toBe("claude-sonnet-4-6");
+  });
+
+  it("preserves project and thread updatedAt timestamps from the read model", () => {
+    const initialState = makeState(makeThread());
+    const readModel = makeReadModel(
+      makeReadModelThread({
+        updatedAt: "2026-02-27T00:05:00.000Z",
+      }),
+    );
+
+    const next = syncServerReadModel(initialState, readModel);
+
+    expect(next.projects[0]?.updatedAt).toBe("2026-02-27T00:00:00.000Z");
+    expect(next.threads[0]?.updatedAt).toBe("2026-02-27T00:05:00.000Z");
   });
 
   it("resolves cursor aliases when session provider is cursor", () => {
     const initialState = makeState(makeThread());
     const readModel = makeReadModel(
       makeReadModelThread({
-        model: "composer",
+        modelSelection: {
+          provider: "cursor",
+          model: "composer",
+        },
         session: {
           threadId: ThreadId.makeUnsafe("thread-1"),
           status: "ready",
@@ -240,15 +310,17 @@ describe("store read model sync", () => {
 
     const next = syncServerReadModel(initialState, readModel);
 
-    expect(next.threads[0]?.model).toBe("composer-1.5");
+    expect(next.threads[0]?.modelSelection.model).toBe("composer-1.5");
     expect(next.threads[0]?.session?.provider).toBe("cursor");
   });
 
   it("preserves the previous provider when a thread session closes", () => {
     const initialState = makeState(
       makeThread({
-        provider: "claudeAgent",
-        model: "claude-sonnet-4-6",
+        modelSelection: {
+          provider: "claudeAgent",
+          model: "claude-sonnet-4-6",
+        },
         session: {
           provider: "claudeAgent",
           status: "ready",
@@ -260,15 +332,18 @@ describe("store read model sync", () => {
     );
     const readModel = makeReadModel(
       makeReadModelThread({
-        model: "claude-sonnet-4-6",
+        modelSelection: {
+          provider: "claudeAgent",
+          model: "claude-sonnet-4-6",
+        },
         session: null,
       }),
     );
 
     const next = syncServerReadModel(initialState, readModel);
 
-    expect(next.threads[0]?.provider).toBe("claudeAgent");
-    expect(next.threads[0]?.model).toBe("claude-sonnet-4-6");
+    expect(next.threads[0]?.modelSelection.provider).toBe("claudeAgent");
+    expect(next.threads[0]?.modelSelection.model).toBe("claude-sonnet-4-6");
     expect(next.threads[0]?.session).toBeNull();
   });
 
@@ -282,26 +357,16 @@ describe("store read model sync", () => {
       snapshotSequence: 1,
       updatedAt: "2026-02-27T00:00:00.000Z",
       projects: [
-        {
+        makeReadModelProject({
           id: ProjectId.makeUnsafe("project-1"),
           title: "Project 1",
           workspaceRoot: "/tmp/project-1",
-          defaultModel: "gpt-5.3-codex",
-          createdAt: "2026-02-27T00:00:00.000Z",
-          updatedAt: "2026-02-27T00:00:00.000Z",
-          deletedAt: null,
-          scripts: [],
-        },
-        {
+        }),
+        makeReadModelProject({
           id: ProjectId.makeUnsafe("project-2"),
           title: "Project 2",
           workspaceRoot: "/tmp/project-2",
-          defaultModel: "gpt-5.3-codex",
-          createdAt: "2026-02-27T00:00:00.000Z",
-          updatedAt: "2026-02-27T00:00:00.000Z",
-          deletedAt: null,
-          scripts: [],
-        },
+        }),
       ],
       threads: [],
     };
@@ -316,8 +381,10 @@ describe("store read model sync", () => {
 
   it("reuses unchanged project and thread references across identical snapshots", () => {
     const initialThread = makeThread({
-      model: "gpt-5.3-codex",
-      provider: "codex",
+      modelSelection: {
+        provider: "codex",
+        model: "gpt-5.3-codex",
+      },
       lastVisitedAt: "2026-02-27T00:00:00.000Z",
       session: {
         provider: "codex",

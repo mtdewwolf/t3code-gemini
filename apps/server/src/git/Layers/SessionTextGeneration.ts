@@ -161,14 +161,18 @@ const makeSessionTextGeneration = Effect.gen(function* () {
           threadId,
           provider: resolvedProvider,
           cwd,
-          model: resolvedModel,
+          ...(resolvedModel
+            ? { modelSelection: { provider: resolvedProvider, model: resolvedModel } as never }
+            : {}),
           runtimeMode: "approval-required",
         });
 
         const turn = yield* providerService.sendTurn({
           threadId,
           input: prompt,
-          model: resolvedModel,
+          ...(resolvedModel
+            ? { modelSelection: { provider: resolvedProvider, model: resolvedModel } as never }
+            : {}),
           ...(attachments && attachments.length > 0 ? { attachments } : {}),
           interactionMode: "default",
         });

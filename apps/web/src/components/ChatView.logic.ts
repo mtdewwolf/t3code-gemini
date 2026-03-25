@@ -1,6 +1,7 @@
 import {
   type OrchestrationThreadActivity,
   ProjectId,
+  type ModelSelection,
   type ProviderKind,
   type ThreadId,
 } from "@t3tools/contracts";
@@ -23,10 +24,7 @@ export const LastInvokedScriptByProjectSchema = Schema.Record(ProjectId, Schema.
 export function buildLocalDraftThread(
   threadId: ThreadId,
   draftThread: DraftThreadState,
-  defaults: {
-    readonly provider: ProviderKind;
-    readonly model: string;
-  },
+  fallbackModelSelection: ModelSelection,
   error: string | null,
 ): Thread {
   return {
@@ -34,8 +32,7 @@ export function buildLocalDraftThread(
     codexThreadId: null,
     projectId: draftThread.projectId,
     title: "New thread",
-    provider: defaults.provider,
-    model: defaults.model,
+    modelSelection: fallbackModelSelection,
     runtimeMode: draftThread.runtimeMode,
     interactionMode: draftThread.interactionMode,
     session: null,

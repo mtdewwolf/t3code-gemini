@@ -1,5 +1,14 @@
 import { Option, Schema, SchemaIssue, Struct } from "effect";
-import { ProviderModelOptions } from "./model";
+import {
+  AmpModelOptions,
+  ClaudeModelOptions,
+  CodexModelOptions,
+  CopilotModelOptions,
+  CursorModelOptions,
+  GeminiCliModelOptions,
+  KiloModelOptions,
+  OpencodeModelOptions,
+} from "./model";
 import {
   ApprovalRequestId,
   CheckpointRef,
@@ -53,6 +62,74 @@ export const ProviderSandboxMode = Schema.Literals([
 ]);
 export type ProviderSandboxMode = typeof ProviderSandboxMode.Type;
 export const DEFAULT_PROVIDER_KIND: ProviderKind = "codex";
+
+export const CodexModelSelection = Schema.Struct({
+  provider: Schema.Literal("codex"),
+  model: TrimmedNonEmptyString,
+  options: Schema.optional(CodexModelOptions),
+});
+export type CodexModelSelection = typeof CodexModelSelection.Type;
+
+export const ClaudeModelSelection = Schema.Struct({
+  provider: Schema.Literal("claudeAgent"),
+  model: TrimmedNonEmptyString,
+  options: Schema.optional(ClaudeModelOptions),
+});
+export type ClaudeModelSelection = typeof ClaudeModelSelection.Type;
+
+export const CopilotModelSelection = Schema.Struct({
+  provider: Schema.Literal("copilot"),
+  model: TrimmedNonEmptyString,
+  options: Schema.optional(CopilotModelOptions),
+});
+export type CopilotModelSelection = typeof CopilotModelSelection.Type;
+
+export const CursorModelSelection = Schema.Struct({
+  provider: Schema.Literal("cursor"),
+  model: TrimmedNonEmptyString,
+  options: Schema.optional(CursorModelOptions),
+});
+export type CursorModelSelection = typeof CursorModelSelection.Type;
+
+export const OpencodeModelSelection = Schema.Struct({
+  provider: Schema.Literal("opencode"),
+  model: TrimmedNonEmptyString,
+  options: Schema.optional(OpencodeModelOptions),
+});
+export type OpencodeModelSelection = typeof OpencodeModelSelection.Type;
+
+export const GeminiCliModelSelection = Schema.Struct({
+  provider: Schema.Literal("geminiCli"),
+  model: TrimmedNonEmptyString,
+  options: Schema.optional(GeminiCliModelOptions),
+});
+export type GeminiCliModelSelection = typeof GeminiCliModelSelection.Type;
+
+export const AmpModelSelection = Schema.Struct({
+  provider: Schema.Literal("amp"),
+  model: TrimmedNonEmptyString,
+  options: Schema.optional(AmpModelOptions),
+});
+export type AmpModelSelection = typeof AmpModelSelection.Type;
+
+export const KiloModelSelection = Schema.Struct({
+  provider: Schema.Literal("kilo"),
+  model: TrimmedNonEmptyString,
+  options: Schema.optional(KiloModelOptions),
+});
+export type KiloModelSelection = typeof KiloModelSelection.Type;
+
+export const ModelSelection = Schema.Union([
+  CodexModelSelection,
+  ClaudeModelSelection,
+  CopilotModelSelection,
+  CursorModelSelection,
+  OpencodeModelSelection,
+  GeminiCliModelSelection,
+  AmpModelSelection,
+  KiloModelSelection,
+]);
+export type ModelSelection = typeof ModelSelection.Type;
 
 export const CodexProviderStartOptions = Schema.Struct({
   binaryPath: Schema.optional(TrimmedNonEmptyString),
@@ -235,7 +312,7 @@ export const OrchestrationProject = Schema.Struct({
   id: ProjectId,
   title: TrimmedNonEmptyString,
   workspaceRoot: TrimmedNonEmptyString,
-  defaultModel: Schema.NullOr(TrimmedNonEmptyString),
+  defaultModelSelection: Schema.NullOr(ModelSelection),
   scripts: Schema.Array(ProjectScript),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
@@ -375,7 +452,7 @@ export const OrchestrationThread = Schema.Struct({
   id: ThreadId,
   projectId: ProjectId,
   title: TrimmedNonEmptyString,
-  model: TrimmedNonEmptyString,
+  modelSelection: ModelSelection,
   runtimeMode: RuntimeMode,
   interactionMode: ProviderInteractionMode.pipe(
     Schema.withDecodingDefault(() => DEFAULT_PROVIDER_INTERACTION_MODE),
@@ -408,7 +485,7 @@ export const ProjectCreateCommand = Schema.Struct({
   projectId: ProjectId,
   title: TrimmedNonEmptyString,
   workspaceRoot: TrimmedNonEmptyString,
-  defaultModel: Schema.optional(TrimmedNonEmptyString),
+  defaultModelSelection: Schema.optional(Schema.NullOr(ModelSelection)),
   createdAt: IsoDateTime,
 });
 
@@ -418,7 +495,7 @@ const ProjectMetaUpdateCommand = Schema.Struct({
   projectId: ProjectId,
   title: Schema.optional(TrimmedNonEmptyString),
   workspaceRoot: Schema.optional(TrimmedNonEmptyString),
-  defaultModel: Schema.optional(TrimmedNonEmptyString),
+  defaultModelSelection: Schema.optional(Schema.NullOr(ModelSelection)),
   scripts: Schema.optional(Schema.Array(ProjectScript)),
 });
 
@@ -434,7 +511,7 @@ const ThreadCreateCommand = Schema.Struct({
   threadId: ThreadId,
   projectId: ProjectId,
   title: TrimmedNonEmptyString,
-  model: TrimmedNonEmptyString,
+  modelSelection: ModelSelection,
   runtimeMode: RuntimeMode,
   interactionMode: ProviderInteractionMode.pipe(
     Schema.withDecodingDefault(() => DEFAULT_PROVIDER_INTERACTION_MODE),
@@ -455,7 +532,7 @@ const ThreadMetaUpdateCommand = Schema.Struct({
   commandId: CommandId,
   threadId: ThreadId,
   title: Schema.optional(TrimmedNonEmptyString),
-  model: Schema.optional(TrimmedNonEmptyString),
+  modelSelection: Schema.optional(ModelSelection),
   branch: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   worktreePath: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
 });
@@ -486,9 +563,7 @@ export const ThreadTurnStartCommand = Schema.Struct({
     text: Schema.String,
     attachments: Schema.Array(ChatAttachment),
   }),
-  provider: Schema.optional(ProviderKind),
-  model: Schema.optional(TrimmedNonEmptyString),
-  modelOptions: Schema.optional(ProviderModelOptions),
+  modelSelection: Schema.optional(ModelSelection),
   providerOptions: Schema.optional(ProviderStartOptions),
   assistantDeliveryMode: Schema.optional(AssistantDeliveryMode),
   runtimeMode: RuntimeMode.pipe(Schema.withDecodingDefault(() => DEFAULT_RUNTIME_MODE)),
@@ -509,9 +584,7 @@ const ClientThreadTurnStartCommand = Schema.Struct({
     text: Schema.String,
     attachments: Schema.Array(UploadChatAttachment),
   }),
-  provider: Schema.optional(ProviderKind),
-  model: Schema.optional(TrimmedNonEmptyString),
-  modelOptions: Schema.optional(ProviderModelOptions),
+  modelSelection: Schema.optional(ModelSelection),
   providerOptions: Schema.optional(ProviderStartOptions),
   assistantDeliveryMode: Schema.optional(AssistantDeliveryMode),
   runtimeMode: RuntimeMode,
@@ -713,7 +786,7 @@ export const ProjectCreatedPayload = Schema.Struct({
   projectId: ProjectId,
   title: TrimmedNonEmptyString,
   workspaceRoot: TrimmedNonEmptyString,
-  defaultModel: Schema.NullOr(TrimmedNonEmptyString),
+  defaultModelSelection: Schema.NullOr(ModelSelection),
   scripts: Schema.Array(ProjectScript),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
@@ -723,7 +796,7 @@ export const ProjectMetaUpdatedPayload = Schema.Struct({
   projectId: ProjectId,
   title: Schema.optional(TrimmedNonEmptyString),
   workspaceRoot: Schema.optional(TrimmedNonEmptyString),
-  defaultModel: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
+  defaultModelSelection: Schema.optional(Schema.NullOr(ModelSelection)),
   scripts: Schema.optional(Schema.Array(ProjectScript)),
   updatedAt: IsoDateTime,
 });
@@ -737,7 +810,7 @@ export const ThreadCreatedPayload = Schema.Struct({
   threadId: ThreadId,
   projectId: ProjectId,
   title: TrimmedNonEmptyString,
-  model: TrimmedNonEmptyString,
+  modelSelection: ModelSelection,
   runtimeMode: RuntimeMode.pipe(Schema.withDecodingDefault(() => DEFAULT_RUNTIME_MODE)),
   interactionMode: ProviderInteractionMode.pipe(
     Schema.withDecodingDefault(() => DEFAULT_PROVIDER_INTERACTION_MODE),
@@ -756,7 +829,7 @@ export const ThreadDeletedPayload = Schema.Struct({
 export const ThreadMetaUpdatedPayload = Schema.Struct({
   threadId: ThreadId,
   title: Schema.optional(TrimmedNonEmptyString),
-  model: Schema.optional(TrimmedNonEmptyString),
+  modelSelection: Schema.optional(ModelSelection),
   branch: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   worktreePath: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   updatedAt: IsoDateTime,
@@ -791,9 +864,7 @@ export const ThreadMessageSentPayload = Schema.Struct({
 export const ThreadTurnStartRequestedPayload = Schema.Struct({
   threadId: ThreadId,
   messageId: MessageId,
-  provider: Schema.optional(ProviderKind),
-  model: Schema.optional(TrimmedNonEmptyString),
-  modelOptions: Schema.optional(ProviderModelOptions),
+  modelSelection: Schema.optional(ModelSelection),
   /** Runtime events carry full ProviderStartOptions (including credentials).
    *  Redaction to ProviderStartOptionsRedacted happens at persistence and broadcast boundaries. */
   providerOptions: Schema.optional(ProviderStartOptions),

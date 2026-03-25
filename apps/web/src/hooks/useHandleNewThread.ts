@@ -7,7 +7,6 @@ import {
 } from "@t3tools/contracts";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useCallback } from "react";
-import { inferProviderForModel } from "@t3tools/shared/model";
 import {
   type DraftThreadEnvMode,
   type DraftThreadState,
@@ -19,8 +18,6 @@ import { useStore } from "../store";
 export function useHandleNewThread() {
   const projects = useStore((store) => store.projects);
   const threads = useStore((store) => store.threads);
-  const stickyModel = useComposerDraftStore((store) => store.stickyModel);
-  const stickyModelOptions = useComposerDraftStore((store) => store.stickyModelOptions);
   const navigate = useNavigate();
   const routeThreadId = useParams({
     strict: false,
@@ -49,10 +46,9 @@ export function useHandleNewThread() {
         clearProjectDraftThreadId,
         getDraftThread,
         getDraftThreadByProjectId,
-        setModel,
-        setModelOptions,
-        setProvider,
+        applyStickyState,
         setDraftThreadContext,
+        setModelSelection,
         setProjectDraftThreadId,
       } = useComposerDraftStore.getState();
       const hasBranchOption = options?.branch !== undefined;
@@ -110,21 +106,14 @@ export function useHandleNewThread() {
           envMode: options?.envMode ?? "local",
           runtimeMode: DEFAULT_RUNTIME_MODE,
         });
-        // Apply sticky model/options first, then explicit overrides.
-        if (stickyModel) {
-          setProvider(threadId, inferProviderForModel(stickyModel));
-          setModel(threadId, stickyModel);
-        }
-        if (Object.keys(stickyModelOptions).length > 0) {
-          setModelOptions(threadId, stickyModelOptions);
-        }
+        applyStickyState(threadId);
 
         // Explicit options override sticky settings.
-        if (options?.provider != null) {
-          setProvider(threadId, options.provider);
-        }
-        if (options?.model != null) {
-          setModel(threadId, options.model);
+        if (options?.provider != null && options?.model != null) {
+          setModelSelection(threadId, {
+            provider: options.provider,
+            model: options.model,
+          });
         }
 
         await navigate({
@@ -133,7 +122,7 @@ export function useHandleNewThread() {
         });
       })();
     },
-    [navigate, routeThreadId, stickyModel, stickyModelOptions],
+    [navigate, routeThreadId],
   );
 
   return {

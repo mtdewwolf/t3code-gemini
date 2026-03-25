@@ -34,17 +34,15 @@ export type KiloSessionStartInput = ProviderSessionStartInput & {
   };
 };
 
-export type KiloSendTurnInput = ProviderSendTurnInput & {
-  readonly modelOptions?: ProviderSendTurnInput["modelOptions"] & {
-    readonly kilo?: {
-      readonly providerId?: string;
-      readonly modelId?: string;
-      readonly variant?: string;
-      readonly reasoningEffort?: string;
-      readonly agent?: string;
-    };
-  };
+export type KiloAdapterOptions = {
+  readonly providerId?: string;
+  readonly modelId?: string;
+  readonly variant?: string;
+  readonly reasoningEffort?: string;
+  readonly agent?: string;
 };
+
+export type KiloSendTurnInput = ProviderSendTurnInput;
 
 // ---------------------------------------------------------------------------
 // Runtime event types

@@ -225,7 +225,7 @@ export class GeminiCliServerManager extends EventEmitter<{
 
     const session: GeminiCliSession = {
       threadId,
-      model: input.model,
+      model: input.modelSelection?.model,
       cwd,
       binaryPath,
       runtimeMode: input.runtimeMode ?? "full-access",
@@ -247,7 +247,7 @@ export class GeminiCliServerManager extends EventEmitter<{
       runtimeMode: session.runtimeMode as ProviderSession["runtimeMode"],
       threadId,
       cwd,
-      model: input.model,
+      model: input.modelSelection?.model,
       ...(resumeSessionId ? { resumeCursor: { sessionId: resumeSessionId } } : {}),
       createdAt: now,
       updatedAt: now,
@@ -261,7 +261,7 @@ export class GeminiCliServerManager extends EventEmitter<{
           binaryPath,
           cwd,
           runtimeMode: session.runtimeMode,
-          ...(input.model ? { model: input.model } : {}),
+          ...(input.modelSelection?.model ? { model: input.modelSelection.model } : {}),
           ...(resumeSessionId ? { resumeSessionId } : {}),
         },
       },
@@ -297,7 +297,7 @@ export class GeminiCliServerManager extends EventEmitter<{
     const prompt = input.input ?? "";
 
     // Use per-turn model override if provided, otherwise fall back to session model.
-    const effectiveModel = input.model ?? session.model;
+    const effectiveModel = input.modelSelection?.model ?? session.model;
 
     // Build args for headless mode with stream-json output.
     const args: string[] = [
