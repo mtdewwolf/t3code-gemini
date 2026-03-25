@@ -2,7 +2,9 @@ import { useCallback, useMemo } from "react";
 import { Option, Schema } from "effect";
 import {
   DEFAULT_GIT_TEXT_GENERATION_MODEL_BY_PROVIDER,
+  TrimmedNonEmptyString,
   type ProviderKind,
+  type ProviderStartOptions,
 } from "@t3tools/contracts";
 import {
   getDefaultModel,
@@ -40,6 +42,12 @@ const AppProviderLogoAppearanceSchema = Schema.Literals(["original", "grayscale"
 export const TIMESTAMP_FORMAT_OPTIONS = ["locale", "12-hour", "24-hour"] as const;
 export type TimestampFormat = (typeof TIMESTAMP_FORMAT_OPTIONS)[number];
 export const DEFAULT_TIMESTAMP_FORMAT: TimestampFormat = "locale";
+export const SidebarProjectSortOrder = Schema.Literals(["updated_at", "created_at", "manual"]);
+export type SidebarProjectSortOrder = typeof SidebarProjectSortOrder.Type;
+export const DEFAULT_SIDEBAR_PROJECT_SORT_ORDER: SidebarProjectSortOrder = "updated_at";
+export const SidebarThreadSortOrder = Schema.Literals(["updated_at", "created_at"]);
+export type SidebarThreadSortOrder = typeof SidebarThreadSortOrder.Type;
+export const DEFAULT_SIDEBAR_THREAD_SORT_ORDER: SidebarThreadSortOrder = "updated_at";
 type CustomModelSettingsKey =
   | "customCodexModels"
   | "customCopilotModels"
@@ -94,6 +102,7 @@ const withDefaults =
     );
 
 export const AppSettingsSchema = Schema.Struct({
+  claudeBinaryPath: Schema.String.check(Schema.isMaxLength(4096)).pipe(withDefaults(() => "")),
   codexBinaryPath: Schema.String.check(Schema.isMaxLength(4096)).pipe(withDefaults(() => "")),
   codexHomePath: Schema.String.check(Schema.isMaxLength(4096)).pipe(withDefaults(() => "")),
   copilotCliPath: Schema.String.check(Schema.isMaxLength(4096)).pipe(withDefaults(() => "")),
@@ -102,9 +111,16 @@ export const AppSettingsSchema = Schema.Struct({
     withDefaults(() => "local" as const),
   ),
   confirmThreadDelete: Schema.Boolean.pipe(withDefaults(() => true)),
+  diffWordWrap: Schema.Boolean.pipe(withDefaults(() => false)),
   enableAssistantStreaming: Schema.Boolean.pipe(withDefaults(() => false)),
   showCommandOutput: Schema.Boolean.pipe(withDefaults(() => true)),
   showFileChangeDiffs: Schema.Boolean.pipe(withDefaults(() => true)),
+  sidebarProjectSortOrder: SidebarProjectSortOrder.pipe(
+    withDefaults(() => DEFAULT_SIDEBAR_PROJECT_SORT_ORDER),
+  ),
+  sidebarThreadSortOrder: SidebarThreadSortOrder.pipe(
+    withDefaults(() => DEFAULT_SIDEBAR_THREAD_SORT_ORDER),
+  ),
   timestampFormat: Schema.Literals(["locale", "12-hour", "24-hour"]).pipe(
     withDefaults(() => DEFAULT_TIMESTAMP_FORMAT),
   ),
@@ -508,6 +524,30 @@ export function getSlashModelOptions(
     const searchName = option.name.toLowerCase();
     return searchSlug.includes(normalizedQuery) || searchName.includes(normalizedQuery);
   });
+}
+
+export function getProviderStartOptions(
+  settings: Pick<AppSettings, "claudeBinaryPath" | "codexBinaryPath" | "codexHomePath">,
+): ProviderStartOptions | undefined {
+  const providerOptions: ProviderStartOptions = {
+    ...(settings.codexBinaryPath || settings.codexHomePath
+      ? {
+          codex: {
+            ...(settings.codexBinaryPath ? { binaryPath: settings.codexBinaryPath } : {}),
+            ...(settings.codexHomePath ? { homePath: settings.codexHomePath } : {}),
+          },
+        }
+      : {}),
+    ...(settings.claudeBinaryPath
+      ? {
+          claudeAgent: {
+            binaryPath: settings.claudeBinaryPath,
+          },
+        }
+      : {}),
+  };
+
+  return Object.keys(providerOptions).length > 0 ? providerOptions : undefined;
 }
 
 let cachedRawSettings: string | null = null;

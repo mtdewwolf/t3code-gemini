@@ -444,7 +444,7 @@ opus-4.6-thinking - Claude 4.6 Opus (Thinking)  (default)
       yield* adapter.startSession({
         provider: "cursor",
         threadId: THREAD_ID,
-        model: "composer-1.5",
+        modelSelection: { provider: "cursor", model: "composer-1.5" },
         runtimeMode: "full-access",
       });
 

@@ -55,15 +55,10 @@ export function resolveDraftThreadDefaults(input: {
     };
   }
 
-  const provider =
-    recentThread.provider ??
-    inferProviderForThreadModel({
-      model: recentThread.model,
-      sessionProviderName: recentThread.session?.provider ?? null,
-    });
+  const provider = recentThread.modelSelection.provider;
 
   return {
     provider,
-    model: resolveModelSlugForProvider(provider, recentThread.model),
+    model: resolveModelSlugForProvider(provider, recentThread.modelSelection.model),
   };
 }

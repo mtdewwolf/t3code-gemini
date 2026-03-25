@@ -1,18 +1,13 @@
 import { Fragment, type ReactNode, createElement, useEffect } from "react";
 import {
-  DEFAULT_MODEL_BY_PROVIDER,
   type ProviderKind,
   ThreadId,
   type OrchestrationReadModel,
   type OrchestrationSessionStatus,
 } from "@t3tools/contracts";
-import {
-  inferProviderForModel,
-  resolveModelSlug,
-  resolveModelSlugForProvider,
-} from "@t3tools/shared/model";
+import { resolveModelSlugForProvider } from "@t3tools/shared/model";
 import { create } from "zustand";
-import { inferProviderForThreadModel, toProviderKind } from "./lib/threadProvider";
+import { toProviderKind } from "./lib/threadProvider";
 import { type ChatMessage, type Project, type Thread } from "./types";
 
 // ── State ────────────────────────────────────────────────────────────
@@ -495,23 +490,33 @@ function mapProjectsFromReadModel(
       id: project.id,
       name: project.title,
       cwd: project.workspaceRoot,
-      model:
-        existing?.model ??
-        resolveModelSlug(project.defaultModel ?? DEFAULT_MODEL_BY_PROVIDER.codex),
+      defaultModelSelection: project.defaultModelSelection
+        ? {
+            ...project.defaultModelSelection,
+            model: resolveModelSlugForProvider(
+              project.defaultModelSelection.provider,
+              project.defaultModelSelection.model,
+            ),
+          }
+        : null,
       expanded:
         existing?.expanded ??
         (persistedExpandedProjectCwds.size > 0
           ? persistedExpandedProjectCwds.has(project.workspaceRoot)
           : true),
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
       scripts,
-    };
+    } satisfies Project;
     if (
       existing &&
       existing.id === normalized.id &&
       existing.name === normalized.name &&
       existing.cwd === normalized.cwd &&
-      existing.model === normalized.model &&
+      areUnknownValuesEqual(existing.defaultModelSelection, normalized.defaultModelSelection) &&
       existing.expanded === normalized.expanded &&
+      existing.createdAt === normalized.createdAt &&
+      existing.updatedAt === normalized.updatedAt &&
       arraysShallowEqual(existing.scripts, scripts)
     ) {
       return existing;
@@ -605,11 +610,6 @@ export function syncServerReadModel(state: AppState, readModel: OrchestrationRea
     .filter((thread) => thread.deletedAt === null)
     .map((thread) => {
       const existing = existingThreadById.get(thread.id);
-      const provider = inferProviderForThreadModel({
-        model: thread.model,
-        sessionProviderName:
-          thread.session?.providerName ?? existing?.provider ?? existing?.session?.provider ?? null,
-      });
       const session = normalizeSession(thread.session, existing?.session ?? null);
       const messages = mapMessages(thread.messages, existing?.messages ?? []);
       const proposedPlans = mapProposedPlans(thread.proposedPlans, existing?.proposedPlans ?? []);
@@ -624,8 +624,13 @@ export function syncServerReadModel(state: AppState, readModel: OrchestrationRea
         codexThreadId: null,
         projectId: thread.projectId,
         title: thread.title,
-        provider,
-        model: resolveModelSlugForProvider(provider, thread.model),
+        modelSelection: {
+          ...thread.modelSelection,
+          model: resolveModelSlugForProvider(
+            thread.modelSelection.provider,
+            thread.modelSelection.model,
+          ),
+        },
         runtimeMode: thread.runtimeMode,
         interactionMode: thread.interactionMode,
         session,
@@ -633,6 +638,7 @@ export function syncServerReadModel(state: AppState, readModel: OrchestrationRea
         proposedPlans,
         error: thread.session?.lastError ?? null,
         createdAt: thread.createdAt,
+        updatedAt: thread.updatedAt,
         latestTurn,
         lastVisitedAt: existing?.lastVisitedAt ?? thread.updatedAt,
         branch: thread.branch,
@@ -646,8 +652,7 @@ export function syncServerReadModel(state: AppState, readModel: OrchestrationRea
         existing.codexThreadId === normalizedThread.codexThreadId &&
         existing.projectId === normalizedThread.projectId &&
         existing.title === normalizedThread.title &&
-        existing.provider === normalizedThread.provider &&
-        existing.model === normalizedThread.model &&
+        areUnknownValuesEqual(existing.modelSelection, normalizedThread.modelSelection) &&
         existing.runtimeMode === normalizedThread.runtimeMode &&
         existing.interactionMode === normalizedThread.interactionMode &&
         existing.session === normalizedThread.session &&
@@ -655,6 +660,7 @@ export function syncServerReadModel(state: AppState, readModel: OrchestrationRea
         existing.proposedPlans === normalizedThread.proposedPlans &&
         existing.error === normalizedThread.error &&
         existing.createdAt === normalizedThread.createdAt &&
+        existing.updatedAt === normalizedThread.updatedAt &&
         existing.latestTurn === normalizedThread.latestTurn &&
         existing.lastVisitedAt === normalizedThread.lastVisitedAt &&
         existing.branch === normalizedThread.branch &&

@@ -21,6 +21,11 @@ import { useIsMobile } from "~/hooks/useMediaQuery";
 import { getLocalStorageItem, setLocalStorageItem } from "~/hooks/useLocalStorage";
 import { Schema } from "effect";
 
+// CookieStore API type (not yet in TypeScript's lib.dom)
+declare const cookieStore: {
+  set(options: { expires: number; name: string; path: string; value: string }): Promise<void>;
+};
+
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 const SIDEBAR_WIDTH = "16rem";

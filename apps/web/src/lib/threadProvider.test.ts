@@ -34,7 +34,7 @@ describe("resolveThreadProvider", () => {
   it("falls back to the thread model when the session is closed", () => {
     expect(
       resolveThreadProvider({
-        model: "composer",
+        modelSelection: { provider: "cursor", model: "composer" },
         session: null,
       }),
     ).toBe("cursor");

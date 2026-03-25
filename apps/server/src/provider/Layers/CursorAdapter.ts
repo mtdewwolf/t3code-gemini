@@ -1207,7 +1207,7 @@ function makeCursorAdapter(options?: CursorAdapterLiveOptions) {
               binaryPath,
               cwd,
               env: process.env,
-              ...(input.model ? { model: input.model } : {}),
+              ...(input.modelSelection?.model ? { model: input.modelSelection.model } : {}),
             }),
           catch: (cause) =>
             new ProviderAdapterProcessError({
@@ -1226,7 +1226,7 @@ function makeCursorAdapter(options?: CursorAdapterLiveOptions) {
           status: "connecting",
           runtimeMode: input.runtimeMode,
           ...(input.cwd ? { cwd: input.cwd } : {}),
-          ...(input.model ? { model: input.model } : {}),
+          ...(input.modelSelection?.model ? { model: input.modelSelection.model } : {}),
           createdAt: startedAt,
           updatedAt: startedAt,
         };
@@ -1442,8 +1442,8 @@ function makeCursorAdapter(options?: CursorAdapterLiveOptions) {
               cwd,
               mcpServers: [],
             };
-            if (input.model) {
-              sessionNewParams.model = input.model;
+            if (input.modelSelection?.model) {
+              sessionNewParams.model = input.modelSelection.model;
             }
             const result = await sendRequest(context, "session/new", sessionNewParams);
             const decoded = Schema.decodeUnknownSync(CursorAcpSessionNewResult)(result);
@@ -1547,7 +1547,7 @@ function makeCursorAdapter(options?: CursorAdapterLiveOptions) {
           createdAt: startedStamp.createdAt,
           threadId: context.session.threadId,
           turnId,
-          payload: input.model ? { model: input.model } : {},
+          payload: input.modelSelection?.model ? { model: input.modelSelection.model } : {},
           providerRefs: {
             providerTurnId: String(turnId),
           },

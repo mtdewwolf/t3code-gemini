@@ -23,7 +23,7 @@ describe("GeminiCliServerManager", () => {
           provider: "geminiCli",
           runtimeMode: "full-access",
           cwd: "/tmp",
-          model: "gemini-2.5-pro",
+          modelSelection: { provider: "geminiCli", model: "gemini-2.5-pro" },
         });
 
         expect(session.provider).toBe("geminiCli");
@@ -207,13 +207,13 @@ describe("GeminiCliServerManager", () => {
           threadId: asThreadId("thread-1"),
           provider: "geminiCli",
           runtimeMode: "full-access",
-          model: "gemini-3-flash",
+          modelSelection: { provider: "geminiCli", model: "gemini-3-flash" },
         });
         await manager.startSession({
           threadId: asThreadId("thread-2"),
           provider: "geminiCli",
           runtimeMode: "full-access",
-          model: "gemini-2.5-pro",
+          modelSelection: { provider: "geminiCli", model: "gemini-2.5-pro" },
         });
 
         const sessions = manager.listSessions();
@@ -295,7 +295,7 @@ describe("GeminiCliServerManager JSON event mapping", () => {
       threadId: asThreadId("thread-json"),
       provider: "geminiCli",
       runtimeMode: "full-access",
-      model: "gemini-2.5-pro",
+      modelSelection: { provider: "geminiCli", model: "gemini-2.5-pro" },
       cwd: "/tmp",
     });
 
@@ -633,7 +633,7 @@ describe.skipIf(!hasGemini || process.env.RUN_GEMINI_LIVE_TESTS !== "1")(
           threadId: asThreadId("live-thread"),
           provider: "geminiCli",
           runtimeMode: "full-access",
-          model: "gemini-2.5-flash",
+          modelSelection: { provider: "geminiCli", model: "gemini-2.5-flash" },
         });
 
         const result = await manager.sendTurn({

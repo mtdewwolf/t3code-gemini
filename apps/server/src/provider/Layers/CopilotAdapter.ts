@@ -1295,7 +1295,10 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
         const client = options?.clientFactory?.(clientOptions) ?? new CopilotClient(clientOptions);
         const pendingApprovalResolvers = new Map<string, PendingApprovalRequest>();
         const pendingUserInputResolvers = new Map<string, PendingUserInputRequest>();
-        const reasoningEffort = getCopilotReasoningEffort(input.modelOptions);
+        const copilotOptions =
+          input.modelSelection?.provider === "copilot" ? input.modelSelection.options : undefined;
+        const model = input.modelSelection?.model;
+        const reasoningEffort = getCopilotReasoningEffort(copilotOptions);
         let sessionRecord: ActiveCopilotSession | undefined;
         const handlers = createInteractionHandlers(
           input.threadId,
@@ -1308,7 +1311,7 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
         yield* validateSessionConfiguration({
           client,
           threadId: input.threadId,
-          model: input.model,
+          model,
           reasoningEffort,
         });
 
@@ -1318,7 +1321,7 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
               return withSanitizedCopilotDesktopEnv(() =>
                 client.resumeSession(resumeSessionId, {
                   ...handlers,
-                  ...(input.model ? { model: input.model } : {}),
+                  ...(model ? { model } : {}),
                   ...(reasoningEffort ? { reasoningEffort } : {}),
                   ...(input.cwd ? { workingDirectory: input.cwd } : {}),
                   ...(configDir ? { configDir } : {}),
@@ -1329,7 +1332,7 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
             return withSanitizedCopilotDesktopEnv(() =>
               client.createSession({
                 ...handlers,
-                ...(input.model ? { model: input.model } : {}),
+                ...(model ? { model } : {}),
                 ...(reasoningEffort ? { reasoningEffort } : {}),
                 ...(input.cwd ? { workingDirectory: input.cwd } : {}),
                 ...(configDir ? { configDir } : {}),
@@ -1355,7 +1358,7 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
           pendingUserInputResolvers,
           cwd: input.cwd,
           configDir,
-          model: input.model,
+          model,
           reasoningEffort,
         });
         const unsubscribe = session.on((event: unknown) => {
@@ -1375,7 +1378,7 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
           makeSyntheticEvent(input.threadId, "session.configured", {
             config: {
               ...(input.cwd ? { cwd: input.cwd } : {}),
-              ...(input.model ? { model: input.model } : {}),
+              ...(model ? { model } : {}),
               ...(reasoningEffort ? { reasoningEffort } : {}),
               ...(configDir ? { configDir } : {}),
               streaming: true,
@@ -1395,7 +1398,7 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
           status: "ready",
           runtimeMode: input.runtimeMode,
           ...(input.cwd ? { cwd: input.cwd } : {}),
-          ...(input.model ? { model: input.model } : {}),
+          ...(model ? { model } : {}),
           threadId: input.threadId,
           resumeCursor: session.sessionId,
           createdAt: record.createdAt,
@@ -1406,12 +1409,15 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
     const sendTurn: CopilotAdapterShape["sendTurn"] = (input) =>
       Effect.gen(function* () {
         const record = yield* getSessionRecord(input.threadId);
-        const explicitReasoningEffort = getCopilotReasoningEffort(input.modelOptions);
-        const nextModel = input.model ?? record.model;
+        const turnCopilotOptions =
+          input.modelSelection?.provider === "copilot" ? input.modelSelection.options : undefined;
+        const turnModel = input.modelSelection?.model;
+        const explicitReasoningEffort = getCopilotReasoningEffort(turnCopilotOptions);
+        const nextModel = turnModel ?? record.model;
         const nextReasoningEffort =
           explicitReasoningEffort !== undefined
             ? explicitReasoningEffort
-            : input.model && input.model !== record.model
+            : turnModel && turnModel !== record.model
               ? undefined
               : record.reasoningEffort;
         const attachments = yield* Effect.forEach(input.attachments ?? [], (attachment) => {

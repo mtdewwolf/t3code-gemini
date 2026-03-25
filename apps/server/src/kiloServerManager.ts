@@ -27,6 +27,7 @@ import {
   type KiloSendTurnInput,
   type KiloDiscoveredModel,
   type SharedServerState,
+  type KiloAdapterOptions,
 } from "./kilo/types.ts";
 import {
   asRecord,
@@ -112,12 +113,13 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
       throw new Error("Kilo session creation did not return a session id");
     }
 
+    const sessionModel = kiloInput.modelSelection?.model;
     const initialSession: KiloProviderSession = {
       provider: PROVIDER,
       status: "ready",
       runtimeMode: kiloInput.runtimeMode,
       ...(directory ? { cwd: directory } : {}),
-      ...(kiloInput.model ? { model: kiloInput.model } : {}),
+      ...(sessionModel ? { model: sessionModel } : {}),
       threadId: kiloInput.threadId,
       resumeCursor: {
         sessionId: providerSessionId,
@@ -192,7 +194,7 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
         config: {
           provider: PROVIDER,
           sessionId: providerSessionId,
-          ...(kiloInput.model ? { model: kiloInput.model } : {}),
+          ...(sessionModel ? { model: sessionModel } : {}),
           directory,
           ...(workspace ? { workspace } : {}),
         },
@@ -206,17 +208,13 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
     const kiloInput = input as KiloSendTurnInput;
     const context = this.requireSession(input.threadId);
     const turnId = createTurnId();
-    const agent =
-      kiloInput.modelOptions?.kilo?.agent ??
-      (kiloInput.interactionMode === "plan" ? "plan" : undefined);
-    const parsedModel = parseKiloModel(kiloInput.model);
-    const providerId = kiloInput.modelOptions?.kilo?.providerId ?? parsedModel?.providerId;
-    const modelId =
-      kiloInput.modelOptions?.kilo?.modelId ?? parsedModel?.modelId ?? kiloInput.model;
-    const variant =
-      kiloInput.modelOptions?.kilo?.variant ??
-      kiloInput.modelOptions?.kilo?.reasoningEffort ??
-      parsedModel?.variant;
+    const turnModel = kiloInput.modelSelection?.model;
+    const kiloOpts = kiloInput.modelSelection?.options as KiloAdapterOptions | undefined;
+    const agent = kiloOpts?.agent ?? (kiloInput.interactionMode === "plan" ? "plan" : undefined);
+    const parsedModel = parseKiloModel(turnModel);
+    const providerId = kiloOpts?.providerId ?? parsedModel?.providerId;
+    const modelId = kiloOpts?.modelId ?? parsedModel?.modelId ?? turnModel;
+    const variant = kiloOpts?.variant ?? kiloOpts?.reasoningEffort ?? parsedModel?.variant;
     const startedAt = nowIso();
 
     context.activeTurnId = turnId;
@@ -224,7 +222,7 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
     context.session = {
       ...stripTransientSessionFields(context.session),
       status: "running",
-      ...(kiloInput.model ? { model: kiloInput.model } : {}),
+      ...(turnModel ? { model: turnModel } : {}),
       activeTurnId: turnId,
       updatedAt: startedAt,
     };
@@ -236,7 +234,7 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
       threadId: kiloInput.threadId,
       createdAt: startedAt,
       turnId,
-      payload: kiloInput.model ? { model: kiloInput.model } : {},
+      payload: turnModel ? { model: turnModel } : {},
     });
 
     this.emitRuntimeEvent({

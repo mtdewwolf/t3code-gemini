@@ -473,6 +473,7 @@ export function deriveWorkLogEntries(
     .filter((activity) => (sinceCreatedAt ? activity.createdAt >= sinceCreatedAt : true))
     .filter((activity) => activity.kind !== "tool.started")
     .filter((activity) => activity.kind !== "task.started" && activity.kind !== "task.completed")
+    .filter((activity) => activity.kind !== "context-window.updated")
     .filter((activity) => activity.summary !== "Checkpoint captured")
     .filter((activity) => !isPlanBoundaryToolActivity(activity))
     .map(toDerivedWorkLogEntry);
