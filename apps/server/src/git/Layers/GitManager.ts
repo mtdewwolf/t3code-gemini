@@ -1284,7 +1284,13 @@ export const makeGitManager = Effect.gen(function* () {
                 Effect.flatMap(() =>
                   Effect.gen(function* () {
                     currentPhase = "pr";
-                    return yield* runPrStep(input.modelSelection, input.cwd, currentBranch, input.provider, input.model);
+                    return yield* runPrStep(
+                      input.modelSelection,
+                      input.cwd,
+                      currentBranch,
+                      input.provider,
+                      input.model,
+                    );
                   }),
                 ),
               )
