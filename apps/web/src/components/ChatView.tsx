@@ -9,7 +9,6 @@ import {
   type MessageId,
   type ModelSelection,
   type ProjectScript,
-  type ModelSlug,
   type ProviderKind,
   type ProjectEntry,
   type ProjectId,
@@ -3258,7 +3257,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
   ]);
 
   const onProviderModelSelect = useCallback(
-    (provider: ProviderKind, model: ModelSlug) => {
+    (provider: ProviderKind, model: string) => {
       if (!activeThread) return;
       if (lockedProvider !== null && provider !== lockedProvider) {
         scheduleComposerFocus();

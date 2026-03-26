@@ -1,4 +1,4 @@
-import { type ModelSlug, type ProviderKind, type ServerProvider } from "@t3tools/contracts";
+import { type ProviderKind, type ServerProvider } from "@t3tools/contracts";
 import { page } from "vitest/browser";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
@@ -31,6 +31,7 @@ const TEST_PROVIDERS: ReadonlyArray<ServerProvider> = [
           reasoningEffortLevels: [effort("low"), effort("medium", true), effort("high")],
           supportsFastMode: true,
           supportsThinkingToggle: false,
+          contextWindowOptions: [],
           promptInjectedEffortLevels: [],
         },
       },
@@ -42,6 +43,7 @@ const TEST_PROVIDERS: ReadonlyArray<ServerProvider> = [
           reasoningEffortLevels: [effort("low"), effort("medium", true), effort("high")],
           supportsFastMode: true,
           supportsThinkingToggle: false,
+          contextWindowOptions: [],
           promptInjectedEffortLevels: [],
         },
       },
@@ -69,6 +71,7 @@ const TEST_PROVIDERS: ReadonlyArray<ServerProvider> = [
           ],
           supportsFastMode: false,
           supportsThinkingToggle: true,
+          contextWindowOptions: [],
           promptInjectedEffortLevels: [],
         },
       },
@@ -85,6 +88,7 @@ const TEST_PROVIDERS: ReadonlyArray<ServerProvider> = [
           ],
           supportsFastMode: false,
           supportsThinkingToggle: true,
+          contextWindowOptions: [],
           promptInjectedEffortLevels: [],
         },
       },
@@ -96,6 +100,7 @@ const TEST_PROVIDERS: ReadonlyArray<ServerProvider> = [
           reasoningEffortLevels: [effort("low"), effort("medium", true), effort("high")],
           supportsFastMode: false,
           supportsThinkingToggle: true,
+          contextWindowOptions: [],
           promptInjectedEffortLevels: [],
         },
       },
@@ -105,7 +110,7 @@ const TEST_PROVIDERS: ReadonlyArray<ServerProvider> = [
 
 async function mountPicker(props: {
   provider: ProviderKind;
-  model: ModelSlug;
+  model: string;
   lockedProvider: ProviderKind | null;
   providers?: ReadonlyArray<ServerProvider>;
   triggerVariant?: "ghost" | "outline";
