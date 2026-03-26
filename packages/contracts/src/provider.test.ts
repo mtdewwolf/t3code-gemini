@@ -21,12 +21,6 @@ describe("ProviderSessionStartInput", () => {
         },
       },
       runtimeMode: "full-access",
-      providerOptions: {
-        codex: {
-          binaryPath: "/usr/local/bin/codex",
-          homePath: "/tmp/.codex",
-        },
-      },
     });
     expect(parsed.runtimeMode).toBe("full-access");
     expect(parsed.modelSelection?.provider).toBe("codex");
@@ -36,8 +30,6 @@ describe("ProviderSessionStartInput", () => {
     }
     expect(parsed.modelSelection.options?.reasoningEffort).toBe("high");
     expect(parsed.modelSelection.options?.fastMode).toBe(true);
-    expect(parsed.providerOptions?.codex?.binaryPath).toBe("/usr/local/bin/codex");
-    expect(parsed.providerOptions?.codex?.homePath).toBe("/tmp/.codex");
   });
 
   it("rejects payloads without runtime mode", () => {
@@ -55,17 +47,9 @@ describe("ProviderSessionStartInput", () => {
       provider: "copilot",
       cwd: "/tmp/workspace",
       model: "claude-sonnet-4.6",
-      providerOptions: {
-        copilot: {
-          cliPath: "/usr/local/bin/gh",
-          configDir: "/tmp/.copilot",
-        },
-      },
       runtimeMode: "full-access",
     });
     expect(parsed.provider).toBe("copilot");
-    expect(parsed.providerOptions?.copilot?.cliPath).toBe("/usr/local/bin/gh");
-    expect(parsed.providerOptions?.copilot?.configDir).toBe("/tmp/.copilot");
     expect(parsed.runtimeMode).toBe("full-access");
   });
 
@@ -83,13 +67,6 @@ describe("ProviderSessionStartInput", () => {
           fastMode: true,
         },
       },
-      providerOptions: {
-        claudeAgent: {
-          binaryPath: "/usr/local/bin/claude",
-          permissionMode: "plan",
-          maxThinkingTokens: 12_000,
-        },
-      },
       runtimeMode: "full-access",
     });
     expect(parsed.provider).toBe("claudeAgent");
@@ -101,13 +78,10 @@ describe("ProviderSessionStartInput", () => {
     expect(parsed.modelSelection.options?.thinking).toBe(true);
     expect(parsed.modelSelection.options?.effort).toBe("max");
     expect(parsed.modelSelection.options?.fastMode).toBe(true);
-    expect(parsed.providerOptions?.claudeAgent?.binaryPath).toBe("/usr/local/bin/claude");
-    expect(parsed.providerOptions?.claudeAgent?.permissionMode).toBe("plan");
-    expect(parsed.providerOptions?.claudeAgent?.maxThinkingTokens).toBe(12_000);
     expect(parsed.runtimeMode).toBe("full-access");
   });
 
-  it("accepts cursor provider payloads with binary path", () => {
+  it("accepts cursor provider payloads with model selection", () => {
     const parsed = decodeProviderSessionStartInput({
       threadId: "thread-1",
       cwd: "/tmp/workspace",
@@ -116,11 +90,6 @@ describe("ProviderSessionStartInput", () => {
         model: "composer-1.5",
         options: {
           thinking: true,
-        },
-      },
-      providerOptions: {
-        cursor: {
-          binaryPath: "/usr/local/bin/agent",
         },
       },
       runtimeMode: "approval-required",
@@ -132,7 +101,6 @@ describe("ProviderSessionStartInput", () => {
         ? parsed.modelSelection.options?.thinking
         : undefined,
     ).toBe(true);
-    expect(parsed.providerOptions?.cursor?.binaryPath).toBe("/usr/local/bin/agent");
     expect(parsed.runtimeMode).toBe("approval-required");
   });
 });

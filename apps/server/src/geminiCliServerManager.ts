@@ -217,8 +217,7 @@ export class GeminiCliServerManager extends EventEmitter<{
       throw new Error(`Gemini CLI session already exists for thread ${threadId}`);
     }
 
-    const geminiOpts = input.providerOptions?.geminiCli as GeminiCliProviderOptions | undefined;
-    const binaryPath = geminiOpts?.binaryPath ?? defaultBinaryPath();
+    const binaryPath = defaultBinaryPath();
     const cwd = input.cwd ?? process.cwd();
     const resumeSessionId = readGeminiResumeSessionId(input.resumeCursor);
     const now = new Date().toISOString();

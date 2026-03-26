@@ -1,4 +1,4 @@
-import { type ModelSlug, type ProviderKind } from "@t3tools/contracts";
+import { type ModelSlug, type ProviderKind, type ServerProvider } from "@t3tools/contracts";
 import {
   normalizeModelSlug,
   parseCursorModelSelection,
@@ -247,6 +247,7 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
   provider: ProviderKind;
   model: ModelSlug;
   lockedProvider: ProviderKind | null;
+  providers?: ReadonlyArray<ServerProvider>;
   modelOptionsByProvider: Record<ProviderKind, ReadonlyArray<ModelOptionEntry>>;
   ultrathinkActive?: boolean;
   activeProviderIconClassName?: string;

@@ -45,8 +45,7 @@ import { useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import {
   type SidebarProjectSortOrder,
   type SidebarThreadSortOrder,
-  useAppSettings,
-} from "../appSettings";
+} from "@t3tools/contracts/settings";
 import { isElectron } from "../env";
 import { APP_STAGE_LABEL, APP_VERSION } from "../branding";
 import { resolveThreadProvider } from "../lib/threadProvider";
@@ -117,6 +116,7 @@ import {
 } from "./Sidebar.logic";
 import { ProviderLogo } from "./ProviderLogo";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
+import { useSettings, useUpdateSettings } from "~/hooks/useSettings";
 
 const EMPTY_KEYBINDINGS: ResolvedKeybindingsConfig = [];
 const THREAD_PREVIEW_LIMIT = 6;
@@ -567,7 +567,7 @@ function ProviderUsageSection() {
     });
   }, []);
 
-  const { settings: usageSettings } = useAppSettings();
+  const usageSettings = useSettings();
 
   const copilotUsage = useProviderUsage("copilot");
   const codexUsage = useProviderUsage("codex");
@@ -591,7 +591,11 @@ function ProviderUsageSection() {
     const showCount = provider === "copilot";
     const hidePlanLabel = provider === "copilot";
     const hidePercentLabel = false;
-    const providerColor = usageSettings.providerAccentColors[provider] || null;
+    const accentMap = (usageSettings as Record<string, unknown>)["providerAccentColors"];
+    const providerColor =
+      accentMap && typeof accentMap === "object"
+        ? ((accentMap as Record<string, string>)[provider] ?? null)
+        : null;
     const colorProp = providerColor ? { accentColor: providerColor } : {};
     // Multiple quotas (e.g. Codex session + weekly)
     if (data?.quotas && data.quotas.length > 0) {
@@ -804,7 +808,8 @@ export default function Sidebar() {
   );
   const navigate = useNavigate();
   const isOnSettings = useLocation({ select: (loc) => loc.pathname === "/settings" });
-  const { settings: appSettings, updateSettings } = useAppSettings();
+  const appSettings = useSettings();
+  const { updateSettings } = useUpdateSettings();
   const { handleNewThread } = useHandleNewThread();
   const routeThreadId = useParams({
     strict: false,
@@ -1722,7 +1727,7 @@ export default function Sidebar() {
                     <span
                       className={`inline-flex shrink-0 items-center justify-center ${
                         isHighlighted ? "text-foreground/55" : "text-muted-foreground/50"
-                      } ${appSettings.grayscaleProviderLogos ? "grayscale" : ""}`}
+                      } ${"grayscaleProviderLogos" in appSettings && appSettings.grayscaleProviderLogos ? "grayscale" : ""}`}
                     >
                       <ProviderLogo provider={provider} className="size-3" />
                     </span>

@@ -413,8 +413,14 @@ export function getDefaultEffort(caps: ModelCapabilities): string | null {
   return caps.reasoningEffortLevels.find((l) => l.isDefault)?.value ?? null;
 }
 
-// ── Data-driven capability resolver ───────────────────────────────────
+const EMPTY_CAPABILITIES: ModelCapabilities = {
+  reasoningEffortLevels: [],
+  supportsFastMode: false,
+  supportsThinkingToggle: false,
+  promptInjectedEffortLevels: [],
+};
 
+/** Look up the capabilities for a specific model under a provider. */
 export function getModelCapabilities(
   provider: ProviderKind,
   model: string | null | undefined,
@@ -423,12 +429,7 @@ export function getModelCapabilities(
   if (slug && MODEL_CAPABILITIES_INDEX[provider]?.[slug]) {
     return MODEL_CAPABILITIES_INDEX[provider][slug];
   }
-  return {
-    reasoningEffortLevels: [],
-    supportsFastMode: false,
-    supportsThinkingToggle: false,
-    promptInjectedEffortLevels: [],
-  };
+  return EMPTY_CAPABILITIES;
 }
 
 export function isClaudeUltrathinkPrompt(text: string | null | undefined): boolean {

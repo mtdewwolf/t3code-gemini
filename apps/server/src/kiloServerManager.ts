@@ -71,7 +71,7 @@ export class KiloServerManager extends EventEmitter<KiloManagerEvents> {
     }
 
     const directory = kiloInput.cwd ?? process.cwd();
-    const options = kiloInput.providerOptions?.kilo;
+    const options = kiloInput.kilo;
     const workspace = options?.workspace;
     const sharedServer = await this.ensureServer(options);
     const client = await createClient({

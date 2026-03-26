@@ -23,7 +23,8 @@ import { clearPromotedDraftThreads, useComposerDraftStore } from "../composerDra
 import { useStore } from "../store";
 import { useTerminalStateStore } from "../terminalStateStore";
 import { terminalRunningSubprocessFromEvent } from "../terminalActivity";
-import { onServerConfigUpdated, onServerWelcome } from "../wsNativeApi";
+import { onServerConfigUpdated, onServerProvidersUpdated, onServerWelcome } from "../wsNativeApi";
+import { migrateLocalSettingsToServer } from "../hooks/useSettings";
 import { providerQueryKeys } from "../lib/providerReactQuery";
 import { projectQueryKeys } from "../lib/projectReactQuery";
 import { collectActiveTerminalThreadIds } from "../lib/terminalStateCleanup";
@@ -266,6 +267,8 @@ function EventRouter() {
         );
     });
     const unsubWelcome = onServerWelcome((payload) => {
+      // Migrate old localStorage settings to server on first connect
+      migrateLocalSettingsToServer();
       void (async () => {
         await syncSnapshot();
         if (disposed) {
@@ -296,8 +299,14 @@ function EventRouter() {
     // don't produce duplicate toasts.
     let subscribed = false;
     const unsubServerConfigUpdated = onServerConfigUpdated((payload) => {
+      // Invalidate the config query so active observers refetch fresh data.
       void queryClient.invalidateQueries({ queryKey: serverQueryKeys.config() });
+
       if (!subscribed) return;
+
+      // Only show keybindings toasts for keybindings changes (no settings in payload)
+      if (payload.settings) return;
+
       const issue = payload.issues.find((entry) => entry.kind.startsWith("keybindings."));
       if (!issue) {
         toastManager.add({
@@ -336,6 +345,9 @@ function EventRouter() {
         },
       });
     });
+    const unsubProvidersUpdated = onServerProvidersUpdated(() => {
+      void queryClient.invalidateQueries({ queryKey: serverQueryKeys.config() });
+    });
     subscribed = true;
     return () => {
       disposed = true;
@@ -345,6 +357,7 @@ function EventRouter() {
       unsubTerminalEvent();
       unsubWelcome();
       unsubServerConfigUpdated();
+      unsubProvidersUpdated();
     };
   }, [
     navigate,

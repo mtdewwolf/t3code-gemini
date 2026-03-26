@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { TrimmedNonEmptyString } from "./baseSchemas";
 import type { ProviderKind } from "./orchestration";
 
 export const CURSOR_REASONING_OPTIONS = ["low", "normal", "high", "xhigh"] as const;
@@ -75,18 +76,20 @@ export const ProviderModelOptions = Schema.Struct({
 });
 export type ProviderModelOptions = typeof ProviderModelOptions.Type;
 
-export type EffortOption = {
-  readonly value: string;
-  readonly label: string;
-  readonly isDefault?: true;
-};
+export const EffortOption = Schema.Struct({
+  value: TrimmedNonEmptyString,
+  label: TrimmedNonEmptyString,
+  isDefault: Schema.optional(Schema.Boolean),
+});
+export type EffortOption = typeof EffortOption.Type;
 
-export type ModelCapabilities = {
-  readonly reasoningEffortLevels: readonly EffortOption[];
-  readonly supportsFastMode: boolean;
-  readonly supportsThinkingToggle: boolean;
-  readonly promptInjectedEffortLevels: readonly string[];
-};
+export const ModelCapabilities = Schema.Struct({
+  reasoningEffortLevels: Schema.Array(EffortOption),
+  supportsFastMode: Schema.Boolean,
+  supportsThinkingToggle: Schema.Boolean,
+  promptInjectedEffortLevels: Schema.Array(TrimmedNonEmptyString),
+});
+export type ModelCapabilities = typeof ModelCapabilities.Type;
 
 type ModelDefinition = {
   readonly slug: string;
@@ -372,8 +375,6 @@ export const DEFAULT_MODEL_BY_PROVIDER: Record<ProviderKind, ModelSlug> = {
   kilo: "gpt-5",
 } as const satisfies Record<ProviderKind, ModelSlug>;
 
-// Backward compatibility for existing Codex-only call sites.
-export const MODEL_OPTIONS = MODEL_OPTIONS_BY_PROVIDER.codex;
 export const DEFAULT_MODEL = DEFAULT_MODEL_BY_PROVIDER.codex;
 export const DEFAULT_GIT_TEXT_GENERATION_MODEL = "gpt-5.4-mini" as const;
 export const DEFAULT_GIT_TEXT_GENERATION_MODEL_BY_PROVIDER = {

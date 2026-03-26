@@ -1197,8 +1197,7 @@ function makeCursorAdapter(options?: CursorAdapterLiveOptions) {
 
         const startedAt = yield* nowIso;
         const cwd = input.cwd ?? process.cwd();
-        const cursorOptions = input.providerOptions?.cursor as { binaryPath?: string } | undefined;
-        const binaryPath = cursorOptions?.binaryPath ?? "agent";
+        const binaryPath = "agent";
         const resumeState = readCursorResumeState(input.resumeCursor);
 
         const child = yield* Effect.try({

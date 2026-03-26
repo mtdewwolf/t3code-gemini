@@ -12,6 +12,7 @@ import { makeCodexAdapterLive } from "./CodexAdapter.ts";
 import { makeCopilotAdapterLive } from "./CopilotAdapter.ts";
 import { makeCursorAdapterLive } from "./CursorAdapter.ts";
 import { makeGeminiCliAdapterLive } from "./GeminiCliAdapter.ts";
+import { ServerSettingsService } from "../../serverSettings.ts";
 import { ProviderSessionDirectory } from "../Services/ProviderSessionDirectory.ts";
 import {
   getProviderCapabilities,
@@ -36,6 +37,7 @@ const providerSessionDirectoryTestLayer = Layer.succeed(ProviderSessionDirectory
 const codexLayer = makeCodexAdapterLive({ manager: new CodexAppServerManager() }).pipe(
   Layer.provideMerge(ServerConfig.layerTest(process.cwd(), process.cwd())),
   Layer.provideMerge(providerSessionDirectoryTestLayer),
+  Layer.provideMerge(ServerSettingsService.layerTest()),
   Layer.provideMerge(NodeServices.layer),
 );
 
@@ -71,6 +73,7 @@ const claudeLayer = makeClaudeAdapterLive({
     }) as never,
 }).pipe(
   Layer.provideMerge(ServerConfig.layerTest(process.cwd(), process.cwd())),
+  Layer.provideMerge(ServerSettingsService.layerTest()),
   Layer.provideMerge(NodeServices.layer),
 );
 
