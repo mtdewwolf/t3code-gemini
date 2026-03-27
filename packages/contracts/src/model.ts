@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { TrimmedNonEmptyString } from "./baseSchemas";
 import type { ProviderKind } from "./orchestration";
 
 export const CURSOR_REASONING_OPTIONS = ["low", "normal", "high", "xhigh"] as const;
@@ -34,6 +35,7 @@ export const ClaudeModelOptions = Schema.Struct({
   thinking: Schema.optional(Schema.Boolean),
   effort: Schema.optional(Schema.Literals(CLAUDE_CODE_EFFORT_OPTIONS)),
   fastMode: Schema.optional(Schema.Boolean),
+  contextWindow: Schema.optional(Schema.String),
 });
 export type ClaudeModelOptions = typeof ClaudeModelOptions.Type;
 
@@ -75,18 +77,28 @@ export const ProviderModelOptions = Schema.Struct({
 });
 export type ProviderModelOptions = typeof ProviderModelOptions.Type;
 
-export type EffortOption = {
-  readonly value: string;
-  readonly label: string;
-  readonly isDefault?: true;
-};
+export const EffortOption = Schema.Struct({
+  value: TrimmedNonEmptyString,
+  label: TrimmedNonEmptyString,
+  isDefault: Schema.optional(Schema.Boolean),
+});
+export type EffortOption = typeof EffortOption.Type;
 
-export type ModelCapabilities = {
-  readonly reasoningEffortLevels: readonly EffortOption[];
-  readonly supportsFastMode: boolean;
-  readonly supportsThinkingToggle: boolean;
-  readonly promptInjectedEffortLevels: readonly string[];
-};
+export const ContextWindowOption = Schema.Struct({
+  value: TrimmedNonEmptyString,
+  label: TrimmedNonEmptyString,
+  isDefault: Schema.optional(Schema.Boolean),
+});
+export type ContextWindowOption = typeof ContextWindowOption.Type;
+
+export const ModelCapabilities = Schema.Struct({
+  reasoningEffortLevels: Schema.Array(EffortOption),
+  supportsFastMode: Schema.Boolean,
+  supportsThinkingToggle: Schema.Boolean,
+  contextWindowOptions: Schema.Array(ContextWindowOption),
+  promptInjectedEffortLevels: Schema.Array(TrimmedNonEmptyString),
+});
+export type ModelCapabilities = typeof ModelCapabilities.Type;
 
 type ModelDefinition = {
   readonly slug: string;
@@ -150,6 +162,7 @@ export const MODEL_OPTIONS_BY_PROVIDER = {
         ],
         supportsFastMode: true,
         supportsThinkingToggle: false,
+        contextWindowOptions: [],
         promptInjectedEffortLevels: [],
       },
     },
@@ -165,6 +178,7 @@ export const MODEL_OPTIONS_BY_PROVIDER = {
         ],
         supportsFastMode: true,
         supportsThinkingToggle: false,
+        contextWindowOptions: [],
         promptInjectedEffortLevels: [],
       },
     },
@@ -180,6 +194,7 @@ export const MODEL_OPTIONS_BY_PROVIDER = {
         ],
         supportsFastMode: true,
         supportsThinkingToggle: false,
+        contextWindowOptions: [],
         promptInjectedEffortLevels: [],
       },
     },
@@ -195,6 +210,7 @@ export const MODEL_OPTIONS_BY_PROVIDER = {
         ],
         supportsFastMode: true,
         supportsThinkingToggle: false,
+        contextWindowOptions: [],
         promptInjectedEffortLevels: [],
       },
     },
@@ -210,6 +226,7 @@ export const MODEL_OPTIONS_BY_PROVIDER = {
         ],
         supportsFastMode: true,
         supportsThinkingToggle: false,
+        contextWindowOptions: [],
         promptInjectedEffortLevels: [],
       },
     },
@@ -225,6 +242,7 @@ export const MODEL_OPTIONS_BY_PROVIDER = {
         ],
         supportsFastMode: true,
         supportsThinkingToggle: false,
+        contextWindowOptions: [],
         promptInjectedEffortLevels: [],
       },
     },
@@ -263,6 +281,10 @@ export const MODEL_OPTIONS_BY_PROVIDER = {
         ],
         supportsFastMode: true,
         supportsThinkingToggle: false,
+        contextWindowOptions: [
+          { value: "200k", label: "200k" },
+          { value: "1m", label: "1M", isDefault: true },
+        ],
         promptInjectedEffortLevels: ["ultrathink"],
       },
     },
@@ -278,6 +300,10 @@ export const MODEL_OPTIONS_BY_PROVIDER = {
         ],
         supportsFastMode: false,
         supportsThinkingToggle: false,
+        contextWindowOptions: [
+          { value: "200k", label: "200k" },
+          { value: "1m", label: "1M", isDefault: true },
+        ],
         promptInjectedEffortLevels: ["ultrathink"],
       },
     },
@@ -288,6 +314,7 @@ export const MODEL_OPTIONS_BY_PROVIDER = {
         reasoningEffortLevels: [],
         supportsFastMode: false,
         supportsThinkingToggle: true,
+        contextWindowOptions: [],
         promptInjectedEffortLevels: [],
       },
     },
@@ -372,8 +399,6 @@ export const DEFAULT_MODEL_BY_PROVIDER: Record<ProviderKind, ModelSlug> = {
   kilo: "gpt-5",
 } as const satisfies Record<ProviderKind, ModelSlug>;
 
-// Backward compatibility for existing Codex-only call sites.
-export const MODEL_OPTIONS = MODEL_OPTIONS_BY_PROVIDER.codex;
 export const DEFAULT_MODEL = DEFAULT_MODEL_BY_PROVIDER.codex;
 export const DEFAULT_GIT_TEXT_GENERATION_MODEL = "gpt-5.4-mini" as const;
 export const DEFAULT_GIT_TEXT_GENERATION_MODEL_BY_PROVIDER = {
@@ -382,7 +407,7 @@ export const DEFAULT_GIT_TEXT_GENERATION_MODEL_BY_PROVIDER = {
   claudeAgent: "claude-haiku-4-5",
 } as const satisfies Record<ProviderKind, ModelSlug>;
 
-export const MODEL_SLUG_ALIASES_BY_PROVIDER: Record<ProviderKind, Record<string, ModelSlug>> = {
+export const MODEL_SLUG_ALIASES_BY_PROVIDER: Record<ProviderKind, Record<string, string>> = {
   codex: {
     "5.4": "gpt-5.4",
     "5.3": "gpt-5.3-codex",

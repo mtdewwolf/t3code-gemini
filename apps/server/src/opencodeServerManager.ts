@@ -74,7 +74,7 @@ export class OpenCodeServerManager extends EventEmitter<OpenCodeManagerEvents> {
     }
 
     const directory = openCodeInput.cwd ?? process.cwd();
-    const options = openCodeInput.providerOptions?.opencode;
+    const options = openCodeInput.opencode;
     const workspace = options?.workspace;
     const sharedServer = await this.ensureServer(options);
     const client = await createClient({

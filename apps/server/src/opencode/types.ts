@@ -27,9 +27,7 @@ export type OpenCodeProviderOptions = {
 };
 
 export type OpenCodeSessionStartInput = ProviderSessionStartInput & {
-  readonly providerOptions?: ProviderSessionStartInput["providerOptions"] & {
-    readonly opencode?: OpenCodeProviderOptions;
-  };
+  readonly opencode?: OpenCodeProviderOptions;
 };
 
 export type OpencodeAdapterOptions = {

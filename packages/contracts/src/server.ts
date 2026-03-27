@@ -2,8 +2,9 @@ import { Schema } from "effect";
 import { IsoDateTime, NonNegativeInt, TrimmedNonEmptyString } from "./baseSchemas";
 import { KeybindingCommand, KeybindingRule, ResolvedKeybindingsConfig } from "./keybindings";
 import { EditorId } from "./editor";
-import { CODEX_REASONING_EFFORT_OPTIONS } from "./model";
+import { CODEX_REASONING_EFFORT_OPTIONS, ModelCapabilities } from "./model";
 import { ProviderKind } from "./orchestration";
+import { ServerSettings } from "./settings";
 
 const KeybindingsMalformedConfigIssue = Schema.Struct({
   kind: Schema.Literal("keybindings.malformed-config"),
@@ -24,8 +25,8 @@ export type ServerConfigIssue = typeof ServerConfigIssue.Type;
 
 const ServerConfigIssues = Schema.Array(ServerConfigIssue);
 
-export const ServerProviderStatusState = Schema.Literals(["ready", "warning", "error"]);
-export type ServerProviderStatusState = typeof ServerProviderStatusState.Type;
+export const ServerProviderState = Schema.Literals(["ready", "warning", "error", "disabled"]);
+export type ServerProviderState = typeof ServerProviderState.Type;
 
 export const ServerProviderAuthStatus = Schema.Literals([
   "authenticated",
@@ -38,12 +39,10 @@ export const ServerProviderModelReasoningEffort = Schema.Literals(CODEX_REASONIN
 export type ServerProviderModelReasoningEffort = typeof ServerProviderModelReasoningEffort.Type;
 
 export const ServerProviderModel = Schema.Struct({
-  id: TrimmedNonEmptyString,
+  slug: TrimmedNonEmptyString,
   name: TrimmedNonEmptyString,
-  supportsReasoningEffort: Schema.Boolean,
-  supportedReasoningEfforts: Schema.optional(Schema.Array(ServerProviderModelReasoningEffort)),
-  defaultReasoningEffort: Schema.optional(ServerProviderModelReasoningEffort),
-  billingMultiplier: Schema.optional(Schema.Number),
+  isCustom: Schema.Boolean,
+  capabilities: Schema.NullOr(ModelCapabilities),
 });
 export type ServerProviderModel = typeof ServerProviderModel.Type;
 
@@ -59,27 +58,30 @@ export const ServerProviderQuotaSnapshot = Schema.Struct({
 });
 export type ServerProviderQuotaSnapshot = typeof ServerProviderQuotaSnapshot.Type;
 
-export const ServerProviderStatus = Schema.Struct({
+export const ServerProvider = Schema.Struct({
   provider: ProviderKind,
-  status: ServerProviderStatusState,
-  available: Schema.Boolean,
+  enabled: Schema.Boolean,
+  installed: Schema.Boolean,
+  version: Schema.NullOr(TrimmedNonEmptyString),
+  status: ServerProviderState,
   authStatus: ServerProviderAuthStatus,
   checkedAt: IsoDateTime,
   message: Schema.optional(TrimmedNonEmptyString),
-  models: Schema.optional(Schema.Array(ServerProviderModel)),
+  models: Schema.Array(ServerProviderModel),
   quotaSnapshots: Schema.optional(Schema.Array(ServerProviderQuotaSnapshot)),
 });
-export type ServerProviderStatus = typeof ServerProviderStatus.Type;
+export type ServerProvider = typeof ServerProvider.Type;
 
-const ServerProviderStatuses = Schema.Array(ServerProviderStatus);
+const ServerProviders = Schema.Array(ServerProvider);
 
 export const ServerConfig = Schema.Struct({
   cwd: TrimmedNonEmptyString,
   keybindingsConfigPath: TrimmedNonEmptyString,
   keybindings: ResolvedKeybindingsConfig,
   issues: ServerConfigIssues,
-  providers: ServerProviderStatuses,
+  providers: ServerProviders,
   availableEditors: Schema.Array(EditorId),
+  settings: ServerSettings,
 });
 export type ServerConfig = typeof ServerConfig.Type;
 
@@ -105,6 +107,11 @@ export type ServerRemoveKeybindingResult = typeof ServerRemoveKeybindingResult.T
 
 export const ServerConfigUpdatedPayload = Schema.Struct({
   issues: ServerConfigIssues,
-  providers: ServerProviderStatuses,
+  settings: Schema.optional(ServerSettings),
 });
 export type ServerConfigUpdatedPayload = typeof ServerConfigUpdatedPayload.Type;
+
+export const ServerProviderUpdatedPayload = Schema.Struct({
+  providers: ServerProviders,
+});
+export type ServerProviderUpdatedPayload = typeof ServerProviderUpdatedPayload.Type;

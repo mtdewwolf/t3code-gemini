@@ -371,6 +371,7 @@ describe("startSession", () => {
         manager.startSession({
           threadId: asThreadId("thread-1"),
           provider: "codex",
+          binaryPath: "codex",
           runtimeMode: "full-access",
         }),
       ).rejects.toThrow("cwd missing");
@@ -419,6 +420,7 @@ describe("startSession", () => {
         manager.startSession({
           threadId: asThreadId("thread-1"),
           provider: "codex",
+          binaryPath: "codex",
           runtimeMode: "full-access",
         }),
       ).rejects.toThrow(
@@ -1011,12 +1013,8 @@ describe.skipIf(!process.env.CODEX_BINARY_PATH)("startSession live Codex resume"
         provider: "codex",
         cwd: workspaceDir,
         runtimeMode: "full-access",
-        providerOptions: {
-          codex: {
-            ...(process.env.CODEX_BINARY_PATH ? { binaryPath: process.env.CODEX_BINARY_PATH } : {}),
-            ...(process.env.CODEX_HOME_PATH ? { homePath: process.env.CODEX_HOME_PATH } : {}),
-          },
-        },
+        binaryPath: process.env.CODEX_BINARY_PATH!,
+        ...(process.env.CODEX_HOME_PATH ? { homePath: process.env.CODEX_HOME_PATH } : {}),
       });
 
       const firstTurn = await manager.sendTurn({
@@ -1046,12 +1044,8 @@ describe.skipIf(!process.env.CODEX_BINARY_PATH)("startSession live Codex resume"
         cwd: workspaceDir,
         runtimeMode: "approval-required",
         resumeCursor: firstSession.resumeCursor,
-        providerOptions: {
-          codex: {
-            ...(process.env.CODEX_BINARY_PATH ? { binaryPath: process.env.CODEX_BINARY_PATH } : {}),
-            ...(process.env.CODEX_HOME_PATH ? { homePath: process.env.CODEX_HOME_PATH } : {}),
-          },
-        },
+        binaryPath: process.env.CODEX_BINARY_PATH!,
+        ...(process.env.CODEX_HOME_PATH ? { homePath: process.env.CODEX_HOME_PATH } : {}),
       });
 
       expect(resumedSession.threadId).toBe(originalThreadId);

@@ -22,6 +22,7 @@ import { GitCore } from "../Services/GitCore.ts";
 import { GitHubCli } from "../Services/GitHubCli.ts";
 import { TextGeneration, type TextGenerationShape } from "../Services/TextGeneration.ts";
 import { SessionTextGeneration } from "../Services/SessionTextGeneration.ts";
+import { ServerSettingsService } from "../../serverSettings.ts";
 
 const COMMIT_TIMEOUT_MS = 10 * 60_000;
 const MAX_PROGRESS_TEXT_LENGTH = 500;
@@ -362,6 +363,7 @@ export const makeGitManager = Effect.gen(function* () {
   const gitHubCli = yield* GitHubCli;
   const textGeneration = yield* TextGeneration;
   const sessionTextGeneration = yield* SessionTextGeneration;
+  const serverSettingsService = yield* ServerSettingsService;
 
   const createProgressEmitter = (
     input: { cwd: string; action: "commit" | "commit_push" | "commit_push_pr" },
@@ -1216,6 +1218,13 @@ export const makeGitManager = Effect.gen(function* () {
         let commitMessageForStep = input.commitMessage;
         let preResolvedCommitSuggestion: CommitAndBranchSuggestion | undefined = undefined;
 
+        const modelSelection = yield* serverSettingsService.getSettings.pipe(
+          Effect.map((settings) => settings.textGenerationModelSelection),
+          Effect.mapError((cause) =>
+            gitManagerError("runStackedAction", "Failed to get server settings.", cause),
+          ),
+        );
+
         if (input.featureBranch) {
           currentPhase = "branch";
           yield* progress.emit({
@@ -1224,7 +1233,7 @@ export const makeGitManager = Effect.gen(function* () {
             label: "Preparing feature branch...",
           });
           const result = yield* runFeatureBranchStep(
-            input.modelSelection,
+            modelSelection,
             input.cwd,
             initialStatus.branch,
             input.commitMessage,
@@ -1243,7 +1252,7 @@ export const makeGitManager = Effect.gen(function* () {
 
         currentPhase = "commit";
         const commit = yield* runCommitStep(
-          input.modelSelection,
+          modelSelection,
           input.cwd,
           input.action,
           currentBranch,
@@ -1285,7 +1294,7 @@ export const makeGitManager = Effect.gen(function* () {
                   Effect.gen(function* () {
                     currentPhase = "pr";
                     return yield* runPrStep(
-                      input.modelSelection,
+                      modelSelection,
                       input.cwd,
                       currentBranch,
                       input.provider,

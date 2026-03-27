@@ -22,6 +22,7 @@ import {
   type CodexAppServerSendTurnInput,
 } from "../../codexAppServerManager.ts";
 import { ServerConfig } from "../../config.ts";
+import { ServerSettingsService } from "../../serverSettings.ts";
 import { ProviderAdapterValidationError } from "../Errors.ts";
 import { CodexAdapter } from "../Services/CodexAdapter.ts";
 import { ProviderSessionDirectory } from "../Services/ProviderSessionDirectory.ts";
@@ -161,6 +162,7 @@ const validationManager = new FakeCodexManager();
 const validationLayer = it.layer(
   makeCodexAdapterLive({ manager: validationManager }).pipe(
     Layer.provideMerge(ServerConfig.layerTest(process.cwd(), process.cwd())),
+    Layer.provideMerge(ServerSettingsService.layerTest()),
     Layer.provideMerge(providerSessionDirectoryTestLayer),
     Layer.provideMerge(NodeServices.layer),
   ),
@@ -212,6 +214,7 @@ validationLayer("CodexAdapterLive validation", (it) => {
       assert.deepStrictEqual(validationManager.startSessionImpl.mock.calls[0]?.[0], {
         provider: "codex",
         threadId: asThreadId("thread-1"),
+        binaryPath: "codex",
         model: "gpt-5.3-codex",
         serviceTier: "fast",
         runtimeMode: "full-access",
@@ -261,6 +264,7 @@ sessionErrorManager.sendTurnImpl.mockImplementation(async () => {
 const sessionErrorLayer = it.layer(
   makeCodexAdapterLive({ manager: sessionErrorManager }).pipe(
     Layer.provideMerge(ServerConfig.layerTest(process.cwd(), process.cwd())),
+    Layer.provideMerge(ServerSettingsService.layerTest()),
     Layer.provideMerge(providerSessionDirectoryTestLayer),
     Layer.provideMerge(NodeServices.layer),
   ),
@@ -329,6 +333,7 @@ const lifecycleManager = new FakeCodexManager();
 const lifecycleLayer = it.layer(
   makeCodexAdapterLive({ manager: lifecycleManager }).pipe(
     Layer.provideMerge(ServerConfig.layerTest(process.cwd(), process.cwd())),
+    Layer.provideMerge(ServerSettingsService.layerTest()),
     Layer.provideMerge(providerSessionDirectoryTestLayer),
     Layer.provideMerge(NodeServices.layer),
   ),

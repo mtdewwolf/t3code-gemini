@@ -1,11 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { ChevronDownIcon, PlusIcon, RotateCcwIcon, Undo2Icon, XIcon } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ChevronDownIcon,
+  InfoIcon,
+  LoaderIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  RotateCcwIcon,
+  Undo2Icon,
+  XIcon,
+} from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import {
   DEFAULT_GIT_TEXT_GENERATION_MODEL_BY_PROVIDER,
   type DesktopUpdateState,
+  PROVIDER_DISPLAY_NAMES,
   type ProviderKind,
+  type ServerProvider,
+  type ServerProviderModel,
 } from "@t3tools/contracts";
 import { getModelOptions, normalizeModelSlug } from "@t3tools/shared/model";
 
@@ -38,8 +50,9 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../components/ui/tooltip"
 import { resolveAndPersistPreferredEditor } from "../editorPreferences";
 import { isElectron } from "../env";
 import { useTheme } from "../hooks/useTheme";
-import { serverConfigQueryOptions } from "../lib/serverReactQuery";
+import { serverConfigQueryOptions, serverQueryKeys } from "../lib/serverReactQuery";
 import { cn } from "../lib/utils";
+import { formatRelativeTime } from "../timestampFormat";
 import { ensureNativeApi, readNativeApi } from "../nativeApi";
 
 const THEME_OPTIONS = [
@@ -154,11 +167,12 @@ function HighlightedLogContent({ content }: { content: string }) {
   );
 }
 
-type InstallBinarySettingsKey = "claudeBinaryPath" | "codexBinaryPath";
+const EMPTY_SERVER_PROVIDERS: ReadonlyArray<ServerProvider> = [];
+
 type InstallProviderSettings = {
   provider: ProviderKind;
   title: string;
-  binaryPathKey: InstallBinarySettingsKey;
+  binaryPathKey: "claudeBinaryPath" | "codexBinaryPath";
   binaryPlaceholder: string;
   binaryDescription: ReactNode;
   homePathKey?: "codexHomePath";
@@ -172,11 +186,7 @@ const INSTALL_PROVIDER_SETTINGS: readonly InstallProviderSettings[] = [
     title: "Codex",
     binaryPathKey: "codexBinaryPath",
     binaryPlaceholder: "Codex binary path",
-    binaryDescription: (
-      <>
-        Leave blank to use <code>codex</code> from your PATH.
-      </>
-    ),
+    binaryDescription: "Path to the Codex binary",
     homePathKey: "codexHomePath",
     homePlaceholder: "CODEX_HOME",
     homeDescription: "Optional custom Codex home and config directory.",
@@ -186,20 +196,115 @@ const INSTALL_PROVIDER_SETTINGS: readonly InstallProviderSettings[] = [
     title: "Claude",
     binaryPathKey: "claudeBinaryPath",
     binaryPlaceholder: "Claude binary path",
-    binaryDescription: (
-      <>
-        Leave blank to use <code>claude</code> from your PATH.
-      </>
-    ),
+    binaryDescription: "Path to the Claude binary",
   },
 ];
 
-function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
+const PROVIDER_STATUS_STYLES = {
+  disabled: {
+    dot: "bg-amber-400",
+    badge: "warning" as const,
+  },
+  error: {
+    dot: "bg-destructive",
+    badge: "error" as const,
+  },
+  ready: {
+    dot: "bg-success",
+    badge: "success" as const,
+  },
+  warning: {
+    dot: "bg-warning",
+    badge: "warning" as const,
+  },
+} as const;
+
+function getProviderSummary(provider: ServerProvider | undefined): {
+  readonly headline: string;
+  readonly detail: string | null;
+} {
+  if (!provider) {
+    return {
+      headline: "Checking provider status",
+      detail: "Waiting for the server to report installation and authentication details.",
+    };
+  }
+  if (!provider.enabled) {
+    return {
+      headline: "Disabled",
+      detail:
+        provider.message ?? "This provider is installed but disabled for new sessions in T3 Code.",
+    };
+  }
+  if (!provider.installed) {
+    return {
+      headline: "Not found",
+      detail: provider.message ?? "CLI not detected on PATH.",
+    };
+  }
+  if (provider.authStatus === "authenticated") {
+    return {
+      headline: "Authenticated",
+      detail: provider.message ?? null,
+    };
+  }
+  if (provider.authStatus === "unauthenticated") {
+    return {
+      headline: "Not authenticated",
+      detail: provider.message ?? null,
+    };
+  }
+  if (provider.status === "warning") {
+    return {
+      headline: "Needs attention",
+      detail:
+        provider.message ?? "The provider is installed, but the server could not fully verify it.",
+    };
+  }
+  if (provider.status === "error") {
+    return {
+      headline: "Unavailable",
+      detail: provider.message ?? "The provider failed its startup checks.",
+    };
+  }
+  return {
+    headline: "Available",
+    detail: provider.message ?? "Installed and ready, but authentication could not be verified.",
+  };
+}
+
+function getProviderVersionLabel(version: string | null | undefined): string | null {
+  if (!version) return null;
+  return version.startsWith("v") ? version : `v${version}`;
+}
+
+/** Returns a timestamp that updates on an interval, forcing re-renders to keep relative times fresh. */
+function useRelativeTimeTick(intervalMs = 1_000): number {
+  const [tick, setTick] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setTick(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return tick;
+}
+
+function SettingsSection({
+  title,
+  headerAction,
+  children,
+}: {
+  title: string;
+  headerAction?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <section className="space-y-3">
-      <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-        {title}
-      </h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+          {title}
+        </h2>
+        {headerAction}
+      </div>
       <div className="relative overflow-hidden rounded-2xl border bg-card not-dark:bg-clip-padding text-card-foreground shadow-xs/5 before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-2xl)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] dark:before:shadow-[0_-1px_--theme(--color-white/6%)]">
         {children}
       </div>
@@ -214,7 +319,6 @@ function SettingsRow({
   resetAction,
   control,
   children,
-  onClick,
 }: {
   title: string;
   description: string;
@@ -222,20 +326,13 @@ function SettingsRow({
   resetAction?: ReactNode;
   control?: ReactNode;
   children?: ReactNode;
-  onClick?: () => void;
 }) {
   return (
     <div
       className="border-t border-border px-4 py-4 first:border-t-0 sm:px-5"
       data-slot="settings-row"
     >
-      <div
-        className={cn(
-          "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between",
-          onClick && "cursor-pointer",
-        )}
-        onClick={onClick}
-      >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex min-h-5 items-center gap-1.5">
             <h3 className="text-sm font-medium text-foreground">{title}</h3>
@@ -283,7 +380,7 @@ function SettingResetButton({ label, onClick }: { label: string; onClick: () => 
 
 function SettingsRouteView() {
   const { theme, setTheme } = useTheme();
-  const { settings, defaults, updateSettings, resetSettings } = useAppSettings();
+  const { settings, updateSettings, resetSettings, defaults } = useAppSettings();
   const serverConfigQuery = useQuery(serverConfigQueryOptions());
   const [isOpeningKeybindings, setIsOpeningKeybindings] = useState(false);
   const [openKeybindingsError, setOpenKeybindingsError] = useState<string | null>(null);
@@ -297,8 +394,6 @@ function SettingsRouteView() {
     amp: false,
     kilo: false,
   });
-  const [selectedCustomModelProvider, setSelectedCustomModelProvider] =
-    useState<ProviderKind>("codex");
   const [customModelInputByProvider, setCustomModelInputByProvider] = useState<
     Record<ProviderKind, string>
   >({
@@ -314,7 +409,13 @@ function SettingsRouteView() {
   const [customModelErrorByProvider, setCustomModelErrorByProvider] = useState<
     Partial<Record<ProviderKind, string | null>>
   >({});
+  const [selectedCustomModelProvider, setSelectedCustomModelProvider] =
+    useState<ProviderKind>("codex");
   const [showAllCustomModels, setShowAllCustomModels] = useState(false);
+  const [isRefreshingProviders, setIsRefreshingProviders] = useState(false);
+  const refreshingRef = useRef(false);
+  const queryClient = useQueryClient();
+  useRelativeTimeTick();
 
   const [updateState, setUpdateState] = useState<DesktopUpdateState | null>(null);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
@@ -426,6 +527,25 @@ function SettingsRouteView() {
     }
   }, [hasDesktopBridge]);
 
+  const refreshProviders = useCallback(() => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    setIsRefreshingProviders(true);
+    const api = ensureNativeApi();
+    api.server
+      .refreshProviders()
+      .then(() => queryClient.invalidateQueries({ queryKey: serverQueryKeys.config() }))
+      .catch((error: unknown) => {
+        console.warn("Failed to refresh providers", error);
+      })
+      .finally(() => {
+        refreshingRef.current = false;
+        setIsRefreshingProviders(false);
+      });
+  }, [queryClient]);
+
+  const modelListRefs = useRef<Partial<Record<ProviderKind, HTMLDivElement | null>>>({});
+
   const codexBinaryPath = settings.codexBinaryPath;
   const codexHomePath = settings.codexHomePath;
   const accentColor = settings.accentColor;
@@ -434,6 +554,7 @@ function SettingsRouteView() {
   const claudeBinaryPath = settings.claudeBinaryPath;
   const keybindingsConfigPath = serverConfigQuery.data?.keybindingsConfigPath ?? null;
   const availableEditors = serverConfigQuery.data?.availableEditors;
+  const serverProviders = serverConfigQuery.data?.providers ?? EMPTY_SERVER_PROVIDERS;
 
   const selectedCustomModelProviderSettings = MODEL_PROVIDER_SETTINGS.find(
     (providerSettings) => providerSettings.provider === selectedCustomModelProvider,
@@ -506,7 +627,11 @@ function SettingsRouteView() {
         }));
         return;
       }
-      if (getModelOptions(provider).some((option) => option.slug === normalized)) {
+      if (
+        serverProviders
+          .find((candidate) => candidate.provider === provider)
+          ?.models.some((option) => !option.isCustom && option.slug === normalized)
+      ) {
         setCustomModelErrorByProvider((existing) => ({
           ...existing,
           [provider]: "That model is already built in.",
@@ -537,8 +662,23 @@ function SettingsRouteView() {
         ...existing,
         [provider]: null,
       }));
+      // Watch for DOM changes (server may push updated model list) and scroll to bottom
+      const el = modelListRefs.current[provider];
+      if (el) {
+        const scrollToEnd = () => el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+        // Immediate scroll for the optimistic update
+        requestAnimationFrame(scrollToEnd);
+        // Also observe mutations for when the server pushes an updated list
+        const observer = new MutationObserver(() => {
+          scrollToEnd();
+          observer.disconnect();
+        });
+        observer.observe(el, { childList: true, subtree: true });
+        // Clean up observer after a reasonable window
+        setTimeout(() => observer.disconnect(), 2000);
+      }
     },
-    [customModelInputByProvider, settings, updateSettings],
+    [customModelInputByProvider, serverProviders, settings, updateSettings],
   );
 
   const removeCustomModel = useCallback(
@@ -581,7 +721,6 @@ function SettingsRouteView() {
       amp: false,
       kilo: false,
     });
-    setSelectedCustomModelProvider("codex");
     setCustomModelInputByProvider({
       codex: "",
       copilot: "",

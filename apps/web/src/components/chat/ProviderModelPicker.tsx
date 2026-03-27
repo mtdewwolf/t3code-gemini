@@ -1,4 +1,4 @@
-import { type ModelSlug, type ProviderKind } from "@t3tools/contracts";
+import { type ModelSlug, type ProviderKind, type ServerProvider } from "@t3tools/contracts";
 import {
   normalizeModelSlug,
   parseCursorModelSelection,
@@ -245,8 +245,9 @@ function providerIconClassName(
 
 export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
   provider: ProviderKind;
-  model: ModelSlug;
+  model: string;
   lockedProvider: ProviderKind | null;
+  providers?: ReadonlyArray<ServerProvider>;
   modelOptionsByProvider: Record<ProviderKind, ReadonlyArray<ModelOptionEntry>>;
   ultrathinkActive?: boolean;
   activeProviderIconClassName?: string;
@@ -254,7 +255,7 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
   disabled?: boolean;
   triggerVariant?: VariantProps<typeof buttonVariants>["variant"];
   triggerClassName?: string;
-  onProviderModelChange: (provider: ProviderKind, model: ModelSlug) => void;
+  onProviderModelChange: (provider: ProviderKind, model: string) => void;
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const activeProvider = props.lockedProvider ?? props.provider;

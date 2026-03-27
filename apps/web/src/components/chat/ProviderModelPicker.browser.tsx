@@ -1,43 +1,141 @@
-import { type ModelSlug, type ProviderKind } from "@t3tools/contracts";
+import { type ProviderKind, type ServerProvider } from "@t3tools/contracts";
 import { page } from "vitest/browser";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
-import { ProviderModelPicker } from "./ProviderModelPicker";
+import { ProviderModelPicker, getCustomModelOptionsByProvider } from "./ProviderModelPicker";
 
-const MODEL_OPTIONS_BY_PROVIDER = {
-  claudeAgent: [
-    { slug: "claude-opus-4-6", name: "Claude Opus 4.6" },
-    { slug: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" },
-    { slug: "claude-haiku-4-5", name: "Claude Haiku 4.5" },
-  ],
-  codex: [
-    { slug: "gpt-5-codex", name: "GPT-5 Codex" },
-    { slug: "gpt-5.3-codex", name: "GPT-5.3 Codex" },
-  ],
-  copilot: [],
-  cursor: [],
-  opencode: [],
-  geminiCli: [],
-  amp: [],
-  kilo: [],
-} as const satisfies Record<ProviderKind, ReadonlyArray<{ slug: ModelSlug; name: string }>>;
+function effort(value: string, isDefault = false) {
+  return {
+    value,
+    label: value,
+    ...(isDefault ? { isDefault: true } : {}),
+  };
+}
+
+const TEST_PROVIDERS: ReadonlyArray<ServerProvider> = [
+  {
+    provider: "codex",
+    enabled: true,
+    installed: true,
+    version: "0.116.0",
+    status: "ready",
+    authStatus: "authenticated",
+    checkedAt: new Date().toISOString(),
+    models: [
+      {
+        slug: "gpt-5-codex",
+        name: "GPT-5 Codex",
+        isCustom: false,
+        capabilities: {
+          reasoningEffortLevels: [effort("low"), effort("medium", true), effort("high")],
+          supportsFastMode: true,
+          supportsThinkingToggle: false,
+          contextWindowOptions: [],
+          promptInjectedEffortLevels: [],
+        },
+      },
+      {
+        slug: "gpt-5.3-codex",
+        name: "GPT-5.3 Codex",
+        isCustom: false,
+        capabilities: {
+          reasoningEffortLevels: [effort("low"), effort("medium", true), effort("high")],
+          supportsFastMode: true,
+          supportsThinkingToggle: false,
+          contextWindowOptions: [],
+          promptInjectedEffortLevels: [],
+        },
+      },
+    ],
+  },
+  {
+    provider: "claudeAgent",
+    enabled: true,
+    installed: true,
+    version: "1.0.0",
+    status: "ready",
+    authStatus: "authenticated",
+    checkedAt: new Date().toISOString(),
+    models: [
+      {
+        slug: "claude-opus-4-6",
+        name: "Claude Opus 4.6",
+        isCustom: false,
+        capabilities: {
+          reasoningEffortLevels: [
+            effort("low"),
+            effort("medium", true),
+            effort("high"),
+            effort("max"),
+          ],
+          supportsFastMode: false,
+          supportsThinkingToggle: true,
+          contextWindowOptions: [],
+          promptInjectedEffortLevels: [],
+        },
+      },
+      {
+        slug: "claude-sonnet-4-6",
+        name: "Claude Sonnet 4.6",
+        isCustom: false,
+        capabilities: {
+          reasoningEffortLevels: [
+            effort("low"),
+            effort("medium", true),
+            effort("high"),
+            effort("max"),
+          ],
+          supportsFastMode: false,
+          supportsThinkingToggle: true,
+          contextWindowOptions: [],
+          promptInjectedEffortLevels: [],
+        },
+      },
+      {
+        slug: "claude-haiku-4-5",
+        name: "Claude Haiku 4.5",
+        isCustom: false,
+        capabilities: {
+          reasoningEffortLevels: [effort("low"), effort("medium", true), effort("high")],
+          supportsFastMode: false,
+          supportsThinkingToggle: true,
+          contextWindowOptions: [],
+          promptInjectedEffortLevels: [],
+        },
+      },
+    ],
+  },
+];
 
 async function mountPicker(props: {
   provider: ProviderKind;
-  model: ModelSlug;
+  model: string;
   lockedProvider: ProviderKind | null;
+  providers?: ReadonlyArray<ServerProvider>;
   triggerVariant?: "ghost" | "outline";
 }) {
   const host = document.createElement("div");
   document.body.append(host);
   const onProviderModelChange = vi.fn();
+  const providers = props.providers ?? TEST_PROVIDERS;
+  const modelOptionsByProvider = getCustomModelOptionsByProvider({
+    customCodexModels: [],
+    customCopilotModels: [],
+    customClaudeModels: [],
+    customCursorModels: [],
+    customOpencodeModels: [],
+    customGeminiCliModels: [],
+    customAmpModels: [],
+    customKiloModels: [],
+  });
   const screen = await render(
     <ProviderModelPicker
       provider={props.provider}
       model={props.model}
       lockedProvider={props.lockedProvider}
-      modelOptionsByProvider={MODEL_OPTIONS_BY_PROVIDER}
+      providers={providers}
+      modelOptionsByProvider={modelOptionsByProvider}
       triggerVariant={props.triggerVariant}
       onProviderModelChange={onProviderModelChange}
     />,
@@ -92,7 +190,7 @@ describe("ProviderModelPicker", () => {
       await providerTrigger.hover();
 
       await vi.waitFor(() => {
-        expect(document.body.textContent ?? "").toContain("GPT-5 Codex");
+        expect(document.body.textContent ?? "").toContain("GPT-5.4");
       });
 
       const providerTriggerElement = Array.from(
@@ -105,7 +203,7 @@ describe("ProviderModelPicker", () => {
       const providerTriggerRect = providerTriggerElement.getBoundingClientRect();
       const modelElement = Array.from(
         document.querySelectorAll<HTMLElement>('[role="menuitemradio"]'),
-      ).find((element) => element.textContent?.includes("GPT-5 Codex"));
+      ).find((element) => element.textContent?.includes("GPT-5.4"));
       if (!modelElement) {
         throw new Error("Expected the submenu model option to be mounted.");
       }
@@ -162,6 +260,42 @@ describe("ProviderModelPicker", () => {
         "claudeAgent",
         "claude-sonnet-4-6",
       );
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  // Fork: picker uses static PROVIDER_OPTIONS, not ServerProvider data,
+  // so the disabled-provider rendering from upstream is not yet wired.
+  it.skip("shows disabled providers as non-selectable entries", async () => {
+    const disabledProviders = TEST_PROVIDERS.slice();
+    const claudeIndex = disabledProviders.findIndex(
+      (provider) => provider.provider === "claudeAgent",
+    );
+    if (claudeIndex >= 0) {
+      const claudeProvider = disabledProviders[claudeIndex]!;
+      disabledProviders[claudeIndex] = {
+        ...claudeProvider,
+        enabled: false,
+        status: "disabled",
+      };
+    }
+    const mounted = await mountPicker({
+      provider: "codex",
+      model: "gpt-5-codex",
+      lockedProvider: null,
+      providers: disabledProviders,
+    });
+
+    try {
+      await page.getByRole("button").click();
+
+      await vi.waitFor(() => {
+        const text = document.body.textContent ?? "";
+        expect(text).toContain("Claude");
+        expect(text).toContain("Disabled");
+        expect(text).not.toContain("Claude Sonnet 4.6");
+      });
     } finally {
       await mounted.cleanup();
     }

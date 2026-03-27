@@ -187,8 +187,7 @@ export class AmpServerManager extends EventEmitter<{
       }
     }
 
-    const ampOpts = input.providerOptions?.amp as AmpProviderOptions | undefined;
-    const binaryPath = ampOpts?.binaryPath ?? defaultBinaryPath();
+    const binaryPath = defaultBinaryPath();
     const cwd = input.cwd ?? process.cwd();
     const model = input.modelSelection?.model;
     const now = new Date().toISOString();

@@ -46,13 +46,31 @@ function createBaseServerConfig(): ServerConfig {
     providers: [
       {
         provider: "codex",
+        enabled: true,
+        installed: true,
+        version: "0.116.0",
         status: "ready",
-        available: true,
         authStatus: "authenticated",
         checkedAt: NOW_ISO,
+        models: [],
       },
     ],
     availableEditors: [],
+    settings: {
+      enableAssistantStreaming: false,
+      defaultThreadEnvMode: "local" as const,
+      textGenerationModelSelection: { provider: "codex" as const, model: "gpt-5.4-mini" },
+      providers: {
+        codex: { enabled: true, binaryPath: "", homePath: "", customModels: [] },
+        claudeAgent: { enabled: true, binaryPath: "", customModels: [] },
+        copilot: { enabled: true, customModels: [] },
+        cursor: { enabled: true, customModels: [] },
+        opencode: { enabled: true, customModels: [] },
+        geminiCli: { enabled: true, customModels: [] },
+        amp: { enabled: true, customModels: [] },
+        kilo: { enabled: true, customModels: [] },
+      },
+    },
   };
 }
 

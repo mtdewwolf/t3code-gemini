@@ -29,9 +29,7 @@ export type KiloProviderOptions = {
 };
 
 export type KiloSessionStartInput = ProviderSessionStartInput & {
-  readonly providerOptions?: ProviderSessionStartInput["providerOptions"] & {
-    readonly kilo?: KiloProviderOptions;
-  };
+  readonly kilo?: KiloProviderOptions;
 };
 
 export type KiloAdapterOptions = {

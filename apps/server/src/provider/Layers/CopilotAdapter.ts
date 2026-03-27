@@ -1282,10 +1282,8 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
           } satisfies ProviderSession;
         }
 
-        const cliPath =
-          normalizeCopilotCliPathOverride(input.providerOptions?.copilot?.cliPath) ??
-          resolveBundledCopilotCliPath();
-        const configDir = trimToUndefined(input.providerOptions?.copilot?.configDir);
+        const cliPath = resolveBundledCopilotCliPath();
+        const configDir: string | undefined = undefined;
         const resumeSessionId = extractResumeSessionId(input.resumeCursor);
         const clientOptions: CopilotClientOptions = {
           ...(cliPath ? { cliPath } : {}),
