@@ -111,17 +111,15 @@ describe("resolveModelSlug", () => {
       DEFAULT_MODEL_BY_PROVIDER.claudeAgent,
     );
     expect(resolveModelSlugForProvider("claudeAgent", "sonnet")).toBe("claude-sonnet-4-6");
-    expect(resolveModelSlugForProvider("claudeAgent", "gpt-5.3-codex")).toBe(
-      DEFAULT_MODEL_BY_PROVIDER.claudeAgent,
-    );
+    // Unknown slugs are preserved (may be custom models)
+    expect(resolveModelSlugForProvider("claudeAgent", "gpt-5.3-codex")).toBe("gpt-5.3-codex");
     expect(resolveModelSlugForProvider("cursor", undefined)).toBe(DEFAULT_MODEL_BY_PROVIDER.cursor);
     expect(resolveModelSlugForProvider("cursor", "composer")).toBe("composer-1.5");
     expect(resolveModelSlugForProvider("cursor", "gpt-5.3-codex-high-fast")).toBe(
       "gpt-5.3-codex-high-fast",
     );
-    expect(resolveModelSlugForProvider("cursor", "claude-sonnet-4-6")).toBe(
-      DEFAULT_MODEL_BY_PROVIDER.cursor,
-    );
+    // Unknown slugs are preserved (may be custom models)
+    expect(resolveModelSlugForProvider("cursor", "claude-sonnet-4-6")).toBe("claude-sonnet-4-6");
   });
 
   it("keeps codex defaults for backward compatibility", () => {

@@ -556,12 +556,9 @@ export function resolveModelSlug(model: string | null | undefined, provider: Pro
     return DEFAULT_MODEL_BY_PROVIDER[provider];
   }
 
-  const catalog = MODEL_SLUG_SET_BY_PROVIDER[provider];
-  if (catalog.size === 0) {
-    return normalized;
-  }
-
-  return catalog.has(normalized) ? normalized : DEFAULT_MODEL_BY_PROVIDER[provider];
+  // Always preserve the normalized slug — it may be a custom model unknown
+  // to the static catalog.  Only fall back to the default for empty input.
+  return normalized;
 }
 
 export function resolveModelSlugForProvider(
