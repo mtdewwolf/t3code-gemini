@@ -277,7 +277,9 @@ jobs:
   finalize:
     name: Finalize release
     needs: [preflight, release]
-    if: ${{ secrets.RELEASE_APP_ID != '' }}
+    # secrets context is not available in job-level `if`. Use an env/output
+    # from a prior job, or simply always run and let the token step fail-fast.
+    if: false # Fork: enable once RELEASE_APP_ID secret is configured
     runs-on: ubuntu-24.04
     steps:
       - id: app_token
