@@ -27,6 +27,7 @@ import { Effect, Layer, Queue, Stream } from "effect";
 
 import { resolveAttachmentPath } from "../../attachmentStore.ts";
 import { ServerConfig } from "../../config.ts";
+import { ServerSettingsService } from "../../serverSettings.ts";
 import {
   ProviderAdapterProcessError,
   ProviderAdapterRequestError,
@@ -447,6 +448,7 @@ function createSessionRecord(input: {
 const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
   Effect.gen(function* () {
     const serverConfig = yield* ServerConfig;
+    const serverSettingsService = yield* ServerSettingsService;
     const nativeEventLogger = options?.nativeEventLogger;
     const runtimeEventQueue = yield* Queue.unbounded<ProviderRuntimeEvent>();
     const sessions = new Map<ThreadId, ActiveCopilotSession>();
@@ -1256,6 +1258,9 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
       sessions.delete(record.threadId);
     };
 
+    /** Resolved CLI path from server settings; updated on each startSession call. */
+    let resolvedCliPath: string | undefined;
+
     const startSession: CopilotAdapterShape["startSession"] = (input) =>
       Effect.gen(function* () {
         if (input.provider !== undefined && input.provider !== PROVIDER) {
@@ -1266,6 +1271,18 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
           });
         }
 
+        const copilotSettings = yield* serverSettingsService.getSettings.pipe(
+          Effect.map((s) => s.providers.copilot),
+          Effect.mapError(
+            (error) =>
+              new ProviderAdapterProcessError({
+                provider: PROVIDER,
+                threadId: input.threadId,
+                detail: error.message,
+                cause: error,
+              }),
+          ),
+        );
         const existing = sessions.get(input.threadId);
         if (existing) {
           return {
@@ -1281,8 +1298,16 @@ const makeCopilotAdapter = (options?: CopilotAdapterLiveOptions) =>
             ...(existing.lastError ? { lastError: existing.lastError } : {}),
           } satisfies ProviderSession;
         }
-
-        const cliPath = resolveBundledCopilotCliPath();
+        if (!copilotSettings.enabled) {
+          return yield* new ProviderAdapterValidationError({
+            provider: PROVIDER,
+            operation: "startSession",
+            issue: "Copilot provider is disabled in server settings.",
+          });
+        }
+        const settingsBinaryPath = copilotSettings.binaryPath.trim();
+        const cliPath = settingsBinaryPath || resolveBundledCopilotCliPath();
+        resolvedCliPath = cliPath;
         const configDir: string | undefined = undefined;
         const resumeSessionId = extractResumeSessionId(input.resumeCursor);
         const clientOptions: CopilotClientOptions = {
@@ -1691,7 +1716,7 @@ export function makeCopilotAdapterLive(options?: CopilotAdapterLiveOptions) {
 
 // ── Dynamic model discovery & usage (consumed by wsServer) ─────────
 
-export async function fetchCopilotModels(): Promise<ReadonlyArray<{
+export async function fetchCopilotModels(overrideCliPath?: string): Promise<ReadonlyArray<{
   slug: string;
   name: string;
   pricingTier?: string;
@@ -1699,7 +1724,7 @@ export async function fetchCopilotModels(): Promise<ReadonlyArray<{
   try {
     const { CopilotClient } = await import("@github/copilot-sdk");
     const { resolveBundledCopilotCliPath } = await import("./copilotCliPath.ts");
-    const cliPath = resolveBundledCopilotCliPath();
+    const cliPath = overrideCliPath?.trim() || resolveBundledCopilotCliPath();
     const client = new CopilotClient({
       ...(cliPath ? { cliPath } : {}),
       logLevel: "error",
@@ -1722,7 +1747,7 @@ export async function fetchCopilotModels(): Promise<ReadonlyArray<{
   }
 }
 
-export async function fetchCopilotUsage(): Promise<{
+export async function fetchCopilotUsage(overrideCliPath?: string): Promise<{
   provider: string;
   quotas?: ReadonlyArray<{
     plan: string;
@@ -1737,7 +1762,7 @@ export async function fetchCopilotUsage(): Promise<{
   try {
     const { CopilotClient } = await import("@github/copilot-sdk");
     const { resolveBundledCopilotCliPath } = await import("./copilotCliPath.ts");
-    const cliPath = resolveBundledCopilotCliPath();
+    const cliPath = overrideCliPath?.trim() || resolveBundledCopilotCliPath();
     const client = new CopilotClient({
       ...(cliPath ? { cliPath } : {}),
       logLevel: "error",
