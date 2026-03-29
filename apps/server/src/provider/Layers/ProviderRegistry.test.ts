@@ -630,8 +630,8 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
 
           yield* Effect.gen(function* () {
             const registry = yield* ProviderRegistry;
-            const initialProbeCount = probeCount;
             yield* registry.getProviders;
+            const initialProbeCount = probeCount;
             yield* registry.getProviders;
             assert.strictEqual(probeCount, initialProbeCount);
           }).pipe(Effect.provide(providerRegistryLayer));
