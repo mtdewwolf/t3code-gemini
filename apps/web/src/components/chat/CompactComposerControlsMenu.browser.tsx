@@ -253,9 +253,7 @@ describe("CompactComposerControlsMenu", () => {
 
     await vi.waitFor(() => {
       const text = document.body.textContent ?? "";
-      expect(text).toContain(
-        'Your prompt contains "ultrathink" in the text. Remove it to change effort.',
-      );
+      expect(text).toContain("Remove Ultrathink from the prompt to change effort.");
     });
   });
 });
