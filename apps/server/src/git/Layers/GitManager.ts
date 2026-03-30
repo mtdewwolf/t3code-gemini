@@ -520,8 +520,7 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
 
   const tempDir = process.env.TMPDIR ?? process.env.TEMP ?? process.env.TMP ?? "/tmp";
 
-  const readConfigValueNullable = (cwd: string, key: string) =>
-    gitCore.readConfigValue(cwd, key).pipe(Effect.catch(() => Effect.succeed(null)));
+  const readConfigValueNullable = (cwd: string, key: string) => gitCore.readConfigValue(cwd, key);
 
   const resolveRemoteRepositoryContext = Effect.fn("resolveRemoteRepositoryContext")(function* (
     cwd: string,
@@ -966,7 +965,9 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
       })
       .pipe(Effect.ensuring(fileSystem.remove(bodyFile).pipe(Effect.catch(() => Effect.void))));
 
-    const created = yield* findOpenPr(cwd, headContext.headSelectors);
+    const created = yield* findOpenPr(cwd, headContext.headSelectors).pipe(
+      Effect.catch(() => Effect.succeed(null)),
+    );
     if (!created) {
       return {
         status: "created" as const,
@@ -1192,7 +1193,7 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
       );
     }
 
-    const preferredBranch = suggestion.branch ?? sanitizeFeatureBranchName(suggestion.subject);
+    const preferredBranch = sanitizeFeatureBranchName(suggestion.branch ?? suggestion.subject);
     const existingBranchNames = yield* gitCore.listLocalBranchNames(cwd);
     const resolvedBranch = resolveAutoFeatureBranchName(existingBranchNames, preferredBranch);
 
