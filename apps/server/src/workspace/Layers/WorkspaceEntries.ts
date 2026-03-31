@@ -76,7 +76,9 @@ function toSearchableWorkspaceEntry(entry: ProjectEntry): SearchableWorkspaceEnt
 function normalizeQuery(input: string): string {
   return input
     .trim()
-    .replace(/^[@./]+/, "")
+    .replace(/^@+/, "")
+    .replace(/^(?:\.\.?\/)+/, "")
+    .replace(/^\/+/, "")
     .toLowerCase();
 }
 
@@ -197,9 +199,8 @@ function insertRankedEntry(
 }
 
 function isPathInIgnoredDirectory(relativePath: string): boolean {
-  return relativePath
-    .split("/")
-    .some((segment) => segment.length > 0 && IGNORED_DIRECTORY_NAMES.has(segment));
+  const segments = relativePath.split("/").filter((segment) => segment.length > 0);
+  return segments.slice(0, -1).some((segment) => IGNORED_DIRECTORY_NAMES.has(segment));
 }
 
 function directoryAncestorsOf(relativePath: string): string[] {
@@ -291,11 +292,16 @@ export const makeWorkspaceEntries = Effect.gen(function* () {
         )
         .map(toSearchableWorkspaceEntry);
 
-      const entries = [...directoryEntries, ...fileEntries];
+      const directoryBudget = Math.floor(WORKSPACE_INDEX_MAX_ENTRIES / 2);
+      const cappedDirectories = directoryEntries.slice(0, directoryBudget);
+      const fileBudget = WORKSPACE_INDEX_MAX_ENTRIES - cappedDirectories.length;
+      const cappedFiles = fileEntries.slice(0, fileBudget);
+      const entries = [...cappedDirectories, ...cappedFiles];
+      const totalAvailable = directoryEntries.length + fileEntries.length;
       return {
         scannedAt: Date.now(),
-        entries: entries.slice(0, WORKSPACE_INDEX_MAX_ENTRIES),
-        truncated: listedFiles.truncated || entries.length > WORKSPACE_INDEX_MAX_ENTRIES,
+        entries,
+        truncated: listedFiles.truncated || totalAvailable > WORKSPACE_INDEX_MAX_ENTRIES,
       };
     },
   );
