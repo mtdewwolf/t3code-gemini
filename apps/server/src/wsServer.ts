@@ -749,7 +749,7 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
           Effect.mapError(
             (cause) =>
               new RouteRequestError({
-                message: `Failed to write workspace file: ${cause.message}`,
+                message: `Failed to write workspace file: ${"detail" in cause ? cause.detail : cause.message}`,
               }),
           ),
         );

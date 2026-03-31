@@ -197,9 +197,9 @@ function insertRankedEntry(
 }
 
 function isPathInIgnoredDirectory(relativePath: string): boolean {
-  const firstSegment = relativePath.split("/")[0];
-  if (!firstSegment) return false;
-  return IGNORED_DIRECTORY_NAMES.has(firstSegment);
+  return relativePath
+    .split("/")
+    .some((segment) => segment.length > 0 && IGNORED_DIRECTORY_NAMES.has(segment));
 }
 
 function directoryAncestorsOf(relativePath: string): string[] {
@@ -322,7 +322,15 @@ export const makeWorkspaceEntries = Effect.gen(function* () {
         }),
     }).pipe(
       Effect.catchIf(
-        () => relativeDir.length > 0,
+        (error) => {
+          if (relativeDir.length === 0) return false;
+          const cause = error.cause;
+          if (cause instanceof Error && "code" in cause) {
+            const code = (cause as NodeJS.ErrnoException).code;
+            return code === "ENOENT" || code === "ENOTDIR";
+          }
+          return false;
+        },
         () => Effect.succeed({ relativeDir, dirents: null }),
       ),
     );
