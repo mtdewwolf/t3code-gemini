@@ -164,8 +164,8 @@ function mapThread(thread: OrchestrationThread): Thread {
       : {}),
     branch: thread.branch,
     worktreePath: thread.worktreePath,
-    turnDiffSummaries: thread.checkpoints.map(mapTurnDiffSummary),
-    activities: thread.activities.map((activity) => ({ ...activity })),
+    turnDiffSummaries: thread.checkpoints.map(mapTurnDiffSummary).slice(-MAX_THREAD_MESSAGES),
+    activities: thread.activities.map((activity) => ({ ...activity })).slice(-MAX_THREAD_MESSAGES),
   };
 }
 

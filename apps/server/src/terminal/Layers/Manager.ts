@@ -101,6 +101,7 @@ interface TerminalSessionState {
   unsubscribeExit: (() => void) | null;
   hasRunningSubprocess: boolean;
   runtimeEnv: Record<string, string> | null;
+  resetGeneration: number;
 }
 
 interface PersistHistoryRequest {
@@ -118,7 +119,7 @@ type DrainProcessEventAction =
       terminalId: string;
       history: string | null;
       data: string;
-      updatedAt: string;
+      resetGeneration: number;
     }
   | {
       type: "exit";
@@ -127,7 +128,7 @@ type DrainProcessEventAction =
       terminalId: string;
       exitCode: number | null;
       exitSignal: number | null;
-      updatedAt: string;
+      resetGeneration: number;
     };
 
 interface TerminalManagerState {
@@ -1071,7 +1072,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
       function* () {
         yield* modifyManagerState((state) => {
           const inactiveSessions = [...state.sessions.values()].filter(
-            (session) => session.status !== "running",
+            (session) => session.status !== "running" && session.status !== "starting",
           );
           if (inactiveSessions.length <= maxRetainedInactiveSessions) {
             return [undefined, state] as const;
@@ -1144,7 +1145,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
               terminalId: session.terminalId,
               history: sanitized.visibleText.length > 0 ? session.history : null,
               data: nextEvent.data,
-              updatedAt: session.updatedAt,
+              resetGeneration: session.resetGeneration,
             } as const;
           }
 
@@ -1173,7 +1174,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
             terminalId: session.terminalId,
             exitCode: session.exitCode,
             exitSignal: session.exitSignal,
-            updatedAt: session.updatedAt,
+            resetGeneration: session.resetGeneration,
           } as const;
         });
 
@@ -1182,7 +1183,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
         }
 
         if (action.type === "output") {
-          if (session.updatedAt !== action.updatedAt) continue;
+          if (session.resetGeneration !== action.resetGeneration) continue;
 
           if (action.history !== null) {
             yield* queuePersist(action.threadId, action.terminalId, action.history);
@@ -1198,7 +1199,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
           continue;
         }
 
-        if (session.updatedAt !== action.updatedAt) return;
+        if (session.resetGeneration !== action.resetGeneration) return;
 
         yield* clearKillFiber(action.process);
         yield* publishEvent({
@@ -1415,6 +1416,9 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
       const session = yield* getSession(threadId, terminalId);
 
       if (Option.isSome(session)) {
+        // Increment resetGeneration so any in-flight drain loop recognises
+        // remaining queued events as stale and skips them.
+        session.value.resetGeneration += 1;
         yield* stopProcess(session.value);
         yield* persistHistory(threadId, terminalId, session.value.history);
       }
@@ -1587,6 +1591,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
               unsubscribeExit: null,
               hasRunningSubprocess: false,
               runtimeEnv: normalizedRuntimeEnv(input.env),
+              resetGeneration: 0,
             };
 
             const createdSession = session;
@@ -1715,6 +1720,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
           session.pendingProcessEvents = [];
           session.pendingProcessEventIndex = 0;
           session.processEventDrainRunning = false;
+          session.resetGeneration += 1;
           session.updatedAt = new Date().toISOString();
           yield* persistHistory(input.threadId, terminalId, session.history);
           yield* publishEvent({
@@ -1760,6 +1766,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
               unsubscribeExit: null,
               hasRunningSubprocess: false,
               runtimeEnv: normalizedRuntimeEnv(input.env),
+              resetGeneration: 0,
             };
             const createdSession = session;
             yield* modifyManagerState((state) => {
@@ -1783,6 +1790,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
           session.pendingProcessEvents = [];
           session.pendingProcessEventIndex = 0;
           session.processEventDrainRunning = false;
+          session.resetGeneration += 1;
           yield* persistHistory(input.threadId, terminalId, session.history);
           yield* startSession(
             session,
