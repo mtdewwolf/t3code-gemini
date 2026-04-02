@@ -80,7 +80,7 @@ function updateProject(
   return changed ? next : projects;
 }
 
-function normalizeModelSelection<T extends { provider: "codex" | "claudeAgent"; model: string }>(
+function normalizeModelSelection<T extends { provider: string; model: string }>(
   selection: T,
 ): T {
   return {
@@ -222,7 +222,7 @@ function buildSidebarThreadSummary(thread: Thread): SidebarThreadSummary {
     latestTurn: thread.latestTurn,
     branch: thread.branch,
     worktreePath: thread.worktreePath,
-    latestUserMessageAt: getLatestUserMessageAt(thread.messages),
+    latestUserMessageAt: getLatestUserMessageAt(thread.messages) ?? undefined,
     hasPendingApprovals: derivePendingApprovals(thread.activities).length > 0,
     hasPendingUserInput: derivePendingUserInputs(thread.activities).length > 0,
     hasActionableProposedPlan: hasActionableProposedPlan(

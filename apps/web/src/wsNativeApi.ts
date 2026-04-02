@@ -89,6 +89,24 @@ export function createWsNativeApi(): NativeApi {
       getSettings: rpcClient.server.getSettings,
       updateSettings: rpcClient.server.updateSettings,
     },
+    logs: {
+      getDir: async () => {
+        if (!window.desktopBridge) throw new Error("No desktop bridge");
+        return { dir: await window.desktopBridge.getLogDir() };
+      },
+      list: async () => {
+        if (!window.desktopBridge) throw new Error("No desktop bridge");
+        return { files: await window.desktopBridge.listLogFiles() };
+      },
+      read: async (filename: string) => {
+        if (!window.desktopBridge) throw new Error("No desktop bridge");
+        return { content: await window.desktopBridge.readLogFile(filename) };
+      },
+    },
+    provider: {
+      listModels: rpcClient.provider?.listModels ?? (async () => ({ models: [] })),
+      getUsage: rpcClient.provider?.getUsage ?? (async () => ({ usage: null })),
+    },
     orchestration: {
       getSnapshot: rpcClient.orchestration.getSnapshot,
       dispatchCommand: rpcClient.orchestration.dispatchCommand,

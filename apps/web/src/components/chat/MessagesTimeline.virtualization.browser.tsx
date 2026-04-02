@@ -114,6 +114,7 @@ function createToolWorkEntry(input: {
     createdAt: isoAt(input.offsetSeconds),
     label: input.label ?? "exec_command completed",
     ...(input.detail ? { detail: input.detail } : {}),
+    activityKind: "tool_use",
     tone: "tool",
     toolTitle: "exec_command",
   };

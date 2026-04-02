@@ -109,6 +109,7 @@ function createMinimalSnapshot(): OrchestrationReadModel {
         createdAt: NOW_ISO,
         updatedAt: NOW_ISO,
         deletedAt: null,
+        archivedAt: null,
         messages: [
           {
             id: "msg-1" as MessageId,

@@ -377,13 +377,13 @@ function AboutVersionSection() {
     void bridge
       .checkForUpdate()
       .then((result) => {
-        setDesktopUpdateStateQueryData(queryClient, result.state);
-        if (!result.checked) {
+        setDesktopUpdateStateQueryData(queryClient, result);
+        if (result.status === "error") {
           toastManager.add({
             type: "error",
             title: "Could not check for updates",
             description:
-              result.state.message ?? "Automatic updates are not available in this build.",
+              result.message ?? "Automatic updates are not available in this build.",
           });
         }
       })
@@ -531,12 +531,24 @@ export function GeneralSettingsPanel() {
         DEFAULT_UNIFIED_SETTINGS.providers.claudeAgent.binaryPath ||
       settings.providers.claudeAgent.customModels.length > 0,
     ),
+    copilot: false,
+    cursor: false,
+    opencode: false,
+    geminiCli: false,
+    amp: false,
+    kilo: false,
   });
   const [customModelInputByProvider, setCustomModelInputByProvider] = useState<
     Record<ProviderKind, string>
   >({
     codex: "",
     claudeAgent: "",
+    copilot: "",
+    cursor: "",
+    opencode: "",
+    geminiCli: "",
+    amp: "",
+    kilo: "",
   });
   const [customModelErrorByProvider, setCustomModelErrorByProvider] = useState<
     Partial<Record<ProviderKind, string | null>>
@@ -980,8 +992,9 @@ export function GeneralSettingsPanel() {
                 model={textGenModel}
                 lockedProvider={null}
                 providers={serverProviders}
-                modelOptionsByProvider={gitModelOptionsByProvider}
-                triggerVariant="outline"
+              modelOptionsByProvider={gitModelOptionsByProvider}
+              allowPromptInjectedEffort={false}
+              triggerVariant="outline"
                 triggerClassName="min-w-0 max-w-none shrink-0 text-foreground/90 hover:text-foreground"
                 onProviderModelChange={(provider, model) => {
                   updateSettings({

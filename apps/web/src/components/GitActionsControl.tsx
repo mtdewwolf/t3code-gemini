@@ -563,8 +563,6 @@ export default function GitActionsControl({
         action,
         ...(commitMessage ? { commitMessage } : {}),
         ...(featureBranch ? { featureBranch } : {}),
-        provider,
-        model: gitTextGenerationModel,
         ...(filePaths ? { filePaths } : {}),
         onProgress: applyProgressEvent,
       });
