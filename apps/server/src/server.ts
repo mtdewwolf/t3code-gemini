@@ -14,6 +14,12 @@ import { ProviderSessionDirectoryLive } from "./provider/Layers/ProviderSessionD
 import { ProviderSessionRuntimeRepositoryLive } from "./persistence/Layers/ProviderSessionRuntime";
 import { makeCodexAdapterLive } from "./provider/Layers/CodexAdapter";
 import { makeClaudeAdapterLive } from "./provider/Layers/ClaudeAdapter";
+import { makeCopilotAdapterLive } from "./provider/Layers/CopilotAdapter";
+import { makeCursorAdapterLive } from "./provider/Layers/CursorAdapter";
+import { makeGeminiCliAdapterLive } from "./provider/Layers/GeminiCliAdapter";
+import { makeOpenCodeAdapterLive } from "./provider/Layers/OpenCodeAdapter";
+import { makeAmpAdapterLive } from "./provider/Layers/AmpAdapter";
+import { makeKiloAdapterLive } from "./provider/Layers/KiloAdapter";
 import { ProviderAdapterRegistryLive } from "./provider/Layers/ProviderAdapterRegistry";
 import { makeProviderServiceLive } from "./provider/Layers/ProviderService";
 import { OrchestrationEngineLive } from "./orchestration/Layers/OrchestrationEngine";
@@ -142,9 +148,25 @@ const ProviderLayerLive = Layer.unwrap(
     const claudeAdapterLayer = makeClaudeAdapterLive(
       nativeEventLogger ? { nativeEventLogger } : undefined,
     );
+    const copilotAdapterLayer = makeCopilotAdapterLive(
+      nativeEventLogger ? { nativeEventLogger } : undefined,
+    );
+    const cursorAdapterLayer = makeCursorAdapterLive(
+      nativeEventLogger ? { nativeEventLogger } : undefined,
+    );
+    const geminiCliAdapterLayer = makeGeminiCliAdapterLive();
+    const openCodeAdapterLayer = makeOpenCodeAdapterLive();
+    const ampAdapterLayer = makeAmpAdapterLive();
+    const kiloAdapterLayer = makeKiloAdapterLive();
     const adapterRegistryLayer = ProviderAdapterRegistryLive.pipe(
       Layer.provide(codexAdapterLayer),
       Layer.provide(claudeAdapterLayer),
+      Layer.provide(copilotAdapterLayer),
+      Layer.provide(cursorAdapterLayer),
+      Layer.provide(geminiCliAdapterLayer),
+      Layer.provide(openCodeAdapterLayer),
+      Layer.provide(ampAdapterLayer),
+      Layer.provide(kiloAdapterLayer),
       Layer.provideMerge(providerSessionDirectoryLayer),
     );
     return makeProviderServiceLive(
