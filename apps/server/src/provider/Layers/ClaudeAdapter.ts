@@ -549,7 +549,7 @@ function buildUserMessage(input: {
     parent_tool_use_id: null,
     message: {
       role: "user",
-      content: input.sdkContent as unknown as SDKUserMessage["message"]["content"],
+      content: input.sdkContent as any,
     },
   } as SDKUserMessage;
 }

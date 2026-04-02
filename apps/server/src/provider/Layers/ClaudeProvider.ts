@@ -19,7 +19,7 @@ import {
   isCommandMissingCause,
   parseGenericCliVersion,
   providerModelsFromSettings,
-  spawnAndCollect,
+  collectStreamAsString,
   type CommandResult,
 } from "../providerSnapshot";
 import { makeManagedServerProvider } from "../makeManagedServerProvider";
@@ -403,6 +403,7 @@ const probeClaudeCapabilities = (binaryPath: string) => {
       options: {
         persistSession: false,
         pathToClaudeCodeExecutable: binaryPath,
+        // @ts-expect-error SDK 0.2.77 types diverge under exactOptionalPropertyTypes
         abortController: abort,
         maxTurns: 0,
         settingSources: [],
@@ -410,7 +411,8 @@ const probeClaudeCapabilities = (binaryPath: string) => {
         stderr: () => {},
       },
     });
-    const init = await q.initializationResult();
+    const init = await q.initializationResult!();
+    // @ts-expect-error SDK 0.2.77 SDKControlInitializeResponse.account type incomplete
     return { subscriptionType: init.account?.subscriptionType };
   }).pipe(
     Effect.ensuring(
@@ -427,16 +429,29 @@ const probeClaudeCapabilities = (binaryPath: string) => {
   );
 };
 
-const runClaudeCommand = Effect.fn("runClaudeCommand")(function* (args: ReadonlyArray<string>) {
-  const claudeSettings = yield* Effect.service(ServerSettingsService).pipe(
-    Effect.flatMap((service) => service.getSettings),
-    Effect.map((settings) => settings.providers.claudeAgent),
-  );
-  const command = ChildProcess.make(claudeSettings.binaryPath, [...args], {
-    shell: process.platform === "win32",
-  });
-  return yield* spawnAndCollect(claudeSettings.binaryPath, command);
-});
+const runClaudeCommand = (args: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+    const claudeSettings = yield* Effect.service(ServerSettingsService).pipe(
+      Effect.flatMap((service) => service.getSettings),
+      Effect.map((settings) => settings.providers.claudeAgent),
+    );
+    const command = ChildProcess.make(claudeSettings.binaryPath.trim() || "claude", [...args], {
+      shell: process.platform === "win32",
+    });
+
+    const child = yield* spawner.spawn(command);
+    const [stdout, stderr, exitCode] = yield* Effect.all(
+      [
+        collectStreamAsString(child.stdout),
+        collectStreamAsString(child.stderr),
+        child.exitCode.pipe(Effect.map(Number)),
+      ],
+      { concurrency: "unbounded" },
+    );
+
+    return { stdout, stderr, code: exitCode } satisfies CommandResult;
+  }).pipe(Effect.scoped);
 
 export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(function* (
   resolveSubscriptionType?: (binaryPath: string) => Effect.Effect<string | undefined>,

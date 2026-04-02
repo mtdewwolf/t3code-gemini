@@ -40,9 +40,13 @@ import {
 import { resolveAttachmentPath } from "../../attachmentStore.ts";
 import { ServerConfig } from "../../config.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
+import { getProviderCapabilities } from "../Services/ProviderAdapter.ts";
+import type { ProviderUsageQuota, ProviderUsageResult } from "@t3tools/contracts";
 import { type EventNdjsonLogger, makeEventNdjsonLogger } from "./EventNdjsonLogger.ts";
 
 const PROVIDER = "codex" as const;
+
+let _codexManagerRef: CodexAppServerManager | null = null;
 
 export interface CodexAdapterLiveOptions {
   readonly manager?: CodexAppServerManager;
@@ -1617,9 +1621,7 @@ const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
 
   return {
     provider: PROVIDER,
-    capabilities: {
-      sessionModelSwitch: "in-session",
-    },
+    capabilities: getProviderCapabilities(PROVIDER),
     startSession,
     sendTurn,
     interruptTurn,
@@ -1634,6 +1636,46 @@ const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
     streamEvents: Stream.fromQueue(runtimeEventQueue),
   } satisfies CodexAdapterShape;
 });
+
+function codexBucketToQuota(
+  bucket: { percentUsed?: number; windowDurationMins?: number; resetsAt?: number } | undefined,
+  label: string,
+): ProviderUsageQuota | undefined {
+  if (!bucket || bucket.percentUsed == null) return undefined;
+  return {
+    plan: label,
+    percentUsed: bucket.percentUsed,
+    ...(bucket.resetsAt ? { resetDate: new Date(bucket.resetsAt * 1000).toISOString() } : {}),
+  };
+}
+
+function formatCodexSessionWindowLabel(windowDurationMins: number): string {
+  const hours = Math.round(windowDurationMins / 60);
+  return `Session (${hours} hrs)`;
+}
+
+export async function fetchCodexUsage(): Promise<ProviderUsageResult> {
+  if (!_codexManagerRef) {
+    return { provider: "codex" };
+  }
+  const limits = await _codexManagerRef.readRateLimits().catch(() => null);
+  if (!limits) {
+    return { provider: "codex" };
+  }
+  const sessionLabel = limits.primary?.windowDurationMins
+    ? formatCodexSessionWindowLabel(limits.primary.windowDurationMins)
+    : "Session";
+  const quotas: ProviderUsageQuota[] = [];
+  const sessionQuota = codexBucketToQuota(limits.primary, sessionLabel);
+  if (sessionQuota) quotas.push(sessionQuota);
+  const weeklyQuota = codexBucketToQuota(limits.weekly, "Weekly");
+  if (weeklyQuota) quotas.push(weeklyQuota);
+  return {
+    provider: "codex",
+    ...(quotas.length > 0 ? { quota: quotas[0] } : {}),
+    ...(quotas.length > 0 ? { quotas } : {}),
+  };
+}
 
 export const CodexAdapterLive = Layer.effect(CodexAdapter, makeCodexAdapter());
 

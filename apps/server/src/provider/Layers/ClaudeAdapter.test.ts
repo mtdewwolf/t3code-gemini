@@ -208,10 +208,11 @@ async function readFirstPromptText(
   if (next.done) {
     return undefined;
   }
-  if (typeof next.value.message.content === "string") {
-    return next.value.message.content;
+  const msg = next.value.message as any;
+  if (typeof msg.content === "string") {
+    return msg.content;
   }
-  const content = next.value.message.content[0];
+  const content = msg.content[0];
   if (!content || content.type !== "text") {
     return undefined;
   }
@@ -589,7 +590,7 @@ describe("ClaudeAdapterLive", () => {
       const createInput = harness.getLastCreateQueryInput();
       const promptMessage = yield* Effect.promise(() => readFirstPromptMessage(createInput));
       assert.isDefined(promptMessage);
-      assert.deepEqual(promptMessage?.message.content, [
+      assert.deepEqual((promptMessage?.message as any).content, [
         {
           type: "text",
           text: "What's in this image?",

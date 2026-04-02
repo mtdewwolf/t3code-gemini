@@ -239,8 +239,8 @@ validationLayer("CodexAdapterLive validation", (it) => {
 
       const usage = yield* Effect.promise(() => fetchCodexUsage());
 
-      assert.equal(usage.provider, "codex");
-      assert.deepStrictEqual(usage.quotas, [
+      assert.equal((usage as any).provider, "codex");
+      assert.deepStrictEqual((usage as any).quotas, [
         {
           plan: "Session (5 hrs)",
           percentUsed: 4,
@@ -252,7 +252,7 @@ validationLayer("CodexAdapterLive validation", (it) => {
           resetDate: "2026-03-15T00:01:13.000Z",
         },
       ]);
-      assert.deepStrictEqual(usage.quota, usage.quotas?.[0]);
+      assert.deepStrictEqual((usage as any).quota, (usage as any).quotas?.[0]);
     }),
   );
 });

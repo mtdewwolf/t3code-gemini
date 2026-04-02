@@ -29,7 +29,7 @@ import {
   isCommandMissingCause,
   parseGenericCliVersion,
   providerModelsFromSettings,
-  spawnAndCollect,
+  collectStreamAsString,
   type CommandResult,
 } from "../providerSnapshot";
 import { makeManagedServerProvider } from "../makeManagedServerProvider";
@@ -306,20 +306,33 @@ const probeCodexCapabilities = (input: {
     }),
   );
 
-const runCodexCommand = Effect.fn("runCodexCommand")(function* (args: ReadonlyArray<string>) {
-  const settingsService = yield* ServerSettingsService;
-  const codexSettings = yield* settingsService.getSettings.pipe(
-    Effect.map((settings) => settings.providers.codex),
-  );
-  const command = ChildProcess.make(codexSettings.binaryPath, [...args], {
-    shell: process.platform === "win32",
-    env: {
-      ...process.env,
-      ...(codexSettings.homePath ? { CODEX_HOME: codexSettings.homePath } : {}),
-    },
-  });
-  return yield* spawnAndCollect(codexSettings.binaryPath, command);
-});
+const runCodexCommand = (args: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+    const settingsService = yield* ServerSettingsService;
+    const codexSettings = yield* settingsService.getSettings.pipe(
+      Effect.map((settings) => settings.providers.codex),
+    );
+    const command = ChildProcess.make(codexSettings.binaryPath, [...args], {
+      shell: process.platform === "win32",
+      env: {
+        ...process.env,
+        ...(codexSettings.homePath ? { CODEX_HOME: codexSettings.homePath } : {}),
+      },
+    });
+
+    const child = yield* spawner.spawn(command);
+    const [stdout, stderr, exitCode] = yield* Effect.all(
+      [
+        collectStreamAsString(child.stdout),
+        collectStreamAsString(child.stderr),
+        child.exitCode.pipe(Effect.map(Number)),
+      ],
+      { concurrency: "unbounded" },
+    );
+
+    return { stdout, stderr, code: exitCode } satisfies CommandResult;
+  }).pipe(Effect.scoped);
 
 export const checkCodexProviderStatus = Effect.fn("checkCodexProviderStatus")(function* (
   resolveAccount?: (input: {

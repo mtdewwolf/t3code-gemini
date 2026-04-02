@@ -11,7 +11,7 @@ import {
   normalizeCopilotCliPathOverride,
   resolveBundledCopilotCliPath,
 } from "../../provider/Layers/copilotCliPath.ts";
-import { TextGenerationError } from "../Errors.ts";
+import { TextGenerationError } from "@t3tools/contracts";
 import {
   CopilotTextGeneration,
   type CopilotTextGenerationShape,
