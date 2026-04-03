@@ -135,6 +135,9 @@ vi.mock("~/lib/utils", async () => {
 
 vi.mock("~/nativeApi", () => ({
   readNativeApi: vi.fn(() => null),
+  ensureNativeApi: vi.fn(() => {
+    throw new Error("ensureNativeApi not available in test");
+  }),
 }));
 
 vi.mock("~/store", () => ({
