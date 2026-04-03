@@ -429,7 +429,8 @@ function PersistentThreadTerminalDrawer({
   const draftThread = useComposerDraftStore(
     (store) => store.draftThreadsByThreadId[threadId] ?? null,
   );
-  const project = useProjectById(serverThread?.projectId ?? draftThread?.projectId);
+  const projectId = serverThread ? serverThread.projectId : draftThread?.projectId;
+  const project = useProjectById(projectId);
   const terminalState = useTerminalStateStore((state) =>
     selectThreadTerminalState(state.terminalStateByThreadId, threadId),
   );
@@ -439,7 +440,9 @@ function PersistentThreadTerminalDrawer({
   const storeSetActiveTerminal = useTerminalStateStore((state) => state.setActiveTerminal);
   const storeCloseTerminal = useTerminalStateStore((state) => state.closeTerminal);
   const [localFocusRequestId, setLocalFocusRequestId] = useState(0);
-  const worktreePath = serverThread?.worktreePath ?? draftThread?.worktreePath ?? null;
+  const worktreePath = serverThread
+    ? serverThread.worktreePath
+    : (draftThread?.worktreePath ?? null);
   const cwd = useMemo(
     () =>
       project
@@ -475,10 +478,22 @@ function PersistentThreadTerminalDrawer({
     [storeSetTerminalHeight, threadId],
   );
 
+  const activeDrawerTerminalGroup =
+    terminalState.terminalGroups.find(
+      (group) => group.id === terminalState.activeTerminalGroupId,
+    ) ??
+    terminalState.terminalGroups.find((group) =>
+      group.terminalIds.includes(terminalState.activeTerminalId),
+    ) ??
+    null;
+  const hasReachedDrawerSplitLimit =
+    (activeDrawerTerminalGroup?.terminalIds.length ?? 0) >= MAX_TERMINALS_PER_GROUP;
+
   const splitTerminal = useCallback(() => {
+    if (hasReachedDrawerSplitLimit) return;
     storeSplitTerminal(threadId, `terminal-${randomUUID()}`);
     bumpFocusRequestId();
-  }, [bumpFocusRequestId, storeSplitTerminal, threadId]);
+  }, [bumpFocusRequestId, hasReachedDrawerSplitLimit, storeSplitTerminal, threadId]);
 
   const createNewTerminal = useCallback(() => {
     storeNewTerminal(threadId, `terminal-${randomUUID()}`);
