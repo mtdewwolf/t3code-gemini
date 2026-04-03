@@ -1379,8 +1379,12 @@ const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
       } catch {
         // Finalizers should never fail and block shutdown.
       }
+      if (_codexManagerRef === manager) {
+        _codexManagerRef = null;
+      }
     }),
   );
+  _codexManagerRef = manager;
   const serverSettingsService = yield* ServerSettingsService;
 
   const startSession: CodexAdapterShape["startSession"] = Effect.fn("startSession")(

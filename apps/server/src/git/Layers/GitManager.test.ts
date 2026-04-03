@@ -6,7 +6,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it } from "@effect/vitest";
 import { Effect, FileSystem, Layer, PlatformError, Scope } from "effect";
 import { expect } from "vitest";
-import type { GitActionProgressEvent } from "@t3tools/contracts";
+import type { GitActionProgressEvent, ModelSelection } from "@t3tools/contracts";
 
 import { GitCommandError, GitHubCliError, TextGenerationError } from "@t3tools/contracts";
 import { type GitManagerShape } from "../Services/GitManager.ts";
@@ -15,22 +15,7 @@ import {
   type GitHubPullRequestSummary,
   GitHubCli,
 } from "../Services/GitHubCli.ts";
-import {
-  type BranchNameGenerationInput,
-  type BranchNameGenerationResult,
-  type CommitMessageGenerationInput,
-  type CommitMessageGenerationResult,
-  type PrContentGenerationInput,
-  type PrContentGenerationResult,
-  type ThreadTitleGenerationInput,
-  type ThreadTitleGenerationResult,
-  type TextGenerationShape,
-  TextGeneration,
-} from "../Services/TextGeneration.ts";
-import {
-  SessionTextGeneration,
-  type SessionTextGenerationShape,
-} from "../Services/SessionTextGeneration.ts";
+import { type TextGenerationShape, TextGeneration } from "../Services/TextGeneration.ts";
 import { GitCoreLive } from "./GitCore.ts";
 import { GitCore } from "../Services/GitCore.ts";
 import { makeGitManager } from "./GitManager.ts";
@@ -59,18 +44,36 @@ interface FakeGhScenario {
 }
 
 interface FakeGitTextGeneration {
-  generateCommitMessage: (
-    input: CommitMessageGenerationInput,
-  ) => Effect.Effect<CommitMessageGenerationResult, TextGenerationError>;
-  generatePrContent: (
-    input: PrContentGenerationInput,
-  ) => Effect.Effect<PrContentGenerationResult, TextGenerationError>;
-  generateBranchName: (
-    input: BranchNameGenerationInput,
-  ) => Effect.Effect<BranchNameGenerationResult, TextGenerationError>;
-  generateThreadTitle: (
-    input: ThreadTitleGenerationInput,
-  ) => Effect.Effect<ThreadTitleGenerationResult, TextGenerationError>;
+  generateCommitMessage: (input: {
+    cwd: string;
+    branch: string | null;
+    stagedSummary: string;
+    stagedPatch: string;
+    includeBranch?: boolean;
+    modelSelection: ModelSelection;
+  }) => Effect.Effect<
+    { subject: string; body: string; branch?: string | undefined },
+    TextGenerationError
+  >;
+  generatePrContent: (input: {
+    cwd: string;
+    baseBranch: string;
+    headBranch: string;
+    commitSummary: string;
+    diffSummary: string;
+    diffPatch: string;
+    modelSelection: ModelSelection;
+  }) => Effect.Effect<{ title: string; body: string }, TextGenerationError>;
+  generateBranchName: (input: {
+    cwd: string;
+    message: string;
+    modelSelection: ModelSelection;
+  }) => Effect.Effect<{ branch: string }, TextGenerationError>;
+  generateThreadTitle: (input: {
+    cwd: string;
+    message: string;
+    modelSelection: ModelSelection;
+  }) => Effect.Effect<{ title: string }, TextGenerationError>;
 }
 
 type FakePullRequest = NonNullable<FakeGhScenario["pullRequest"]>;
@@ -571,16 +574,6 @@ function runStackedAction(
     actionId?: string;
     commitMessage?: string;
     featureBranch?: boolean;
-    provider?:
-      | "codex"
-      | "copilot"
-      | "claudeAgent"
-      | "cursor"
-      | "opencode"
-      | "geminiCli"
-      | "amp"
-      | "kilo";
-    model?: string;
     filePaths?: readonly string[];
   },
   options?: Parameters<GitManagerShape["runStackedAction"]>[1],
@@ -592,39 +585,6 @@ function runStackedAction(
     },
     options,
   );
-}
-
-function createSessionTextGeneration(
-  overrides: Partial<FakeGitTextGeneration> = {},
-): SessionTextGenerationShape {
-  const implementation: FakeGitTextGeneration = {
-    generateCommitMessage: () =>
-      Effect.succeed({
-        subject: "Session: implement stacked git actions",
-        body: "",
-      }),
-    generatePrContent: () =>
-      Effect.succeed({
-        title: "Session: add stacked git actions",
-        body: "## Summary\n- Add stacked git workflow\n\n## Testing\n- Not run",
-      }),
-    generateBranchName: () =>
-      Effect.succeed({
-        branch: "session-generated-branch",
-      }),
-    generateThreadTitle: () =>
-      Effect.succeed({
-        title: "Session generated thread",
-      }),
-    ...overrides,
-  };
-
-  return {
-    generateCommitMessage: implementation.generateCommitMessage,
-    generatePrContent: implementation.generatePrContent,
-    generateBranchName: implementation.generateBranchName,
-    generateThreadTitle: implementation.generateThreadTitle,
-  };
 }
 
 function resolvePullRequest(manager: GitManagerShape, input: { cwd: string; reference: string }) {
@@ -641,11 +601,9 @@ function preparePullRequestThread(
 function makeManager(input?: {
   ghScenario?: FakeGhScenario;
   textGeneration?: Partial<FakeGitTextGeneration>;
-  sessionTextGeneration?: Partial<FakeGitTextGeneration>;
 }) {
   const { service: gitHubCli, ghCalls } = createGitHubCliWithFakeGh(input?.ghScenario);
   const textGeneration = createTextGeneration(input?.textGeneration);
-  const sessionTextGeneration = createSessionTextGeneration(input?.sessionTextGeneration);
   const ServerConfigLayer = ServerConfig.layerTest(process.cwd(), {
     prefix: "t3-git-manager-test-",
   });
@@ -660,7 +618,6 @@ function makeManager(input?: {
   const managerLayer = Layer.mergeAll(
     Layer.succeed(GitHubCli, gitHubCli),
     Layer.succeed(TextGeneration, textGeneration),
-    Layer.succeed(SessionTextGeneration, sessionTextGeneration),
     gitCoreLayer,
     serverSettingsLayer,
   ).pipe(Layer.provideMerge(NodeServices.layer));
@@ -849,7 +806,7 @@ it.layer(GitManagerTestLayer)("GitManager", (it) => {
           "pr list --head jasonLaster:statemachine --state all --limit 20 --json number,title,url,baseRefName,headRefName,state,mergedAt,updatedAt,isCrossRepository,headRepository,headRepositoryOwner",
         );
       }),
-    30_000,
+    12_000,
   );
 
   it.effect(
@@ -1101,64 +1058,6 @@ it.layer(GitManagerTestLayer)("GitManager", (it) => {
           Effect.map((result) => result.stdout.trim()),
         ),
       ).toBe("Implement stacked git actions");
-    }),
-  );
-
-  it.effect("uses session provider/model for generated git content when provided", () =>
-    Effect.gen(function* () {
-      const repoDir = yield* makeTempDir("t3code-git-manager-");
-      yield* initRepo(repoDir);
-      fs.writeFileSync(path.join(repoDir, "README.md"), "hello\nsession-model\n");
-
-      let defaultGenerationCount = 0;
-      let sessionGenerationCount = 0;
-      let receivedProvider: string | undefined;
-      let receivedModel: string | undefined;
-
-      const { manager } = yield* makeManager({
-        textGeneration: {
-          generateCommitMessage: () =>
-            Effect.sync(() => {
-              defaultGenerationCount += 1;
-              return {
-                subject: "Default generator should not be used",
-                body: "",
-              };
-            }),
-        },
-        sessionTextGeneration: {
-          generateCommitMessage: (input) =>
-            Effect.sync(() => {
-              sessionGenerationCount += 1;
-              receivedProvider = input.provider;
-              receivedModel = input.model;
-              return {
-                subject: "Session generator commit subject",
-                body: "",
-                ...(input.includeBranch ? { branch: "feature/session-generator" } : {}),
-              };
-            }),
-        },
-      });
-
-      const result = yield* runStackedAction(manager, {
-        cwd: repoDir,
-        action: "commit",
-        provider: "cursor",
-        model: "opus-4.6-thinking",
-      });
-
-      expect(result.commit.status).toBe("created");
-      expect(result.commit.subject).toBe("Session generator commit subject");
-      expect(defaultGenerationCount).toBe(0);
-      expect(sessionGenerationCount).toBe(1);
-      expect(receivedProvider).toBe("cursor");
-      expect(receivedModel).toBe("opus-4.6-thinking");
-      expect(
-        yield* runGit(repoDir, ["log", "-1", "--pretty=%s"]).pipe(
-          Effect.map((commitResult) => commitResult.stdout.trim()),
-        ),
-      ).toBe("Session generator commit subject");
     }),
   );
 
@@ -1646,7 +1545,7 @@ it.layer(GitManagerTestLayer)("GitManager", (it) => {
         ).toBe(true);
         expect(ghCalls.some((call) => call.startsWith("pr create "))).toBe(false);
       }),
-    30_000,
+    12_000,
   );
 
   it.effect(
@@ -1808,7 +1707,7 @@ it.layer(GitManagerTestLayer)("GitManager", (it) => {
         expect(ownerSelectorCallIndex).toBeGreaterThanOrEqual(0);
         expect(ghCalls.some((call) => call.startsWith("pr create "))).toBe(false);
       }),
-    30_000,
+    12_000,
   );
 
   it.effect(
@@ -1870,7 +1769,7 @@ it.layer(GitManagerTestLayer)("GitManager", (it) => {
           "pr list --head octocat:statemachine --state open --limit 1",
         );
       }),
-    30_000,
+    12_000,
   );
 
   it.effect("creates PR when one does not already exist", () =>
