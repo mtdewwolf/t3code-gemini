@@ -80,6 +80,7 @@ interface TerminalStartInput {
   threadId: string;
   terminalId: string;
   cwd: string;
+  worktreePath?: string | null;
   cols: number;
   rows: number;
   env?: Record<string, string>;
@@ -89,6 +90,7 @@ interface TerminalSessionState {
   threadId: string;
   terminalId: string;
   cwd: string;
+  worktreePath: string | null;
   status: TerminalSessionStatus;
   pid: number | null;
   history: string;
@@ -146,6 +148,7 @@ function snapshot(session: TerminalSessionState): TerminalSessionSnapshot {
     threadId: session.threadId,
     terminalId: session.terminalId,
     cwd: session.cwd,
+    worktreePath: session.worktreePath,
     status: session.status,
     pid: session.pid,
     history: session.history,
@@ -1318,6 +1321,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
       yield* modifyManagerState((state) => {
         session.status = "starting";
         session.cwd = input.cwd;
+        session.worktreePath = input.worktreePath ?? null;
         session.cols = input.cols;
         session.rows = input.rows;
         session.exitCode = null;
@@ -1589,6 +1593,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
               threadId: input.threadId,
               terminalId,
               cwd: input.cwd,
+              worktreePath: input.worktreePath ?? null,
               status: "starting",
               pid: null,
               history,
@@ -1623,6 +1628,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
                 threadId: input.threadId,
                 terminalId,
                 cwd: input.cwd,
+                ...(input.worktreePath !== undefined ? { worktreePath: input.worktreePath } : {}),
                 cols,
                 rows,
                 ...(input.env ? { env: input.env } : {}),
@@ -1642,6 +1648,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
           if (liveSession.cwd !== input.cwd || runtimeEnvChanged) {
             yield* stopProcess(liveSession);
             liveSession.cwd = input.cwd;
+            liveSession.worktreePath = input.worktreePath ?? null;
             liveSession.runtimeEnv = nextRuntimeEnv;
             liveSession.history = "";
             liveSession.pendingHistoryControlSequence = "";
@@ -1655,6 +1662,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
             );
           } else if (liveSession.status === "exited" || liveSession.status === "error") {
             liveSession.runtimeEnv = nextRuntimeEnv;
+            liveSession.worktreePath = input.worktreePath ?? null;
             liveSession.history = "";
             liveSession.pendingHistoryControlSequence = "";
             liveSession.pendingProcessEvents = [];
@@ -1674,6 +1682,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
                 threadId: input.threadId,
                 terminalId,
                 cwd: input.cwd,
+                worktreePath: liveSession.worktreePath,
                 cols: targetCols,
                 rows: targetRows,
                 ...(input.env ? { env: input.env } : {}),
@@ -1765,6 +1774,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
               threadId: input.threadId,
               terminalId,
               cwd: input.cwd,
+              worktreePath: input.worktreePath ?? null,
               status: "starting",
               pid: null,
               history: "",
@@ -1795,6 +1805,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
             session = existingSession.value;
             yield* stopProcess(session);
             session.cwd = input.cwd;
+            session.worktreePath = input.worktreePath ?? null;
             session.runtimeEnv = normalizedRuntimeEnv(input.env);
           }
 
@@ -1814,6 +1825,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
               threadId: input.threadId,
               terminalId,
               cwd: input.cwd,
+              ...(input.worktreePath !== undefined ? { worktreePath: input.worktreePath } : {}),
               cols,
               rows,
               ...(input.env ? { env: input.env } : {}),
