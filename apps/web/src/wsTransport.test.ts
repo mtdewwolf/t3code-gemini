@@ -1,4 +1,4 @@
-import { WS_METHODS } from "@t3tools/contracts";
+import { DEFAULT_SERVER_SETTINGS, WS_METHODS } from "@t3tools/contracts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -702,5 +702,47 @@ describe("WsTransport", () => {
     });
 
     expect(callOrder).toEqual(["close:start", "close:done", "runtime:dispose"]);
+  });
+
+  it("propagates OTLP trace ids for ws transport requests when client tracing is enabled", async () => {
+    await configureClientTracing({
+      exportIntervalMs: 10,
+    });
+
+    const transport = new WsTransport("ws://localhost:3020");
+    const requestPromise = transport.request((client) => client[WS_METHODS.serverGetSettings]({}));
+
+    await waitFor(() => {
+      expect(sockets).toHaveLength(1);
+    });
+
+    const socket = getSocket();
+    socket.open();
+
+    await waitFor(() => {
+      expect(socket.sent).toHaveLength(1);
+    });
+
+    const requestMessage = JSON.parse(socket.sent[0] ?? "{}") as {
+      id: string;
+      spanId?: string;
+      traceId?: string;
+    };
+    expect(requestMessage.traceId).toMatch(/^[0-9a-f]{32}$/);
+    expect(requestMessage.spanId).toMatch(/^[0-9a-f]{16}$/);
+
+    socket.serverMessage(
+      JSON.stringify({
+        _tag: "Exit",
+        requestId: requestMessage.id,
+        exit: {
+          _tag: "Success",
+          value: DEFAULT_SERVER_SETTINGS,
+        },
+      }),
+    );
+
+    await expect(requestPromise).resolves.toEqual(DEFAULT_SERVER_SETTINGS);
+    await transport.dispose();
   });
 });
