@@ -6,6 +6,8 @@ interface CommandPathOptions {
   readonly env?: NodeJS.ProcessEnv;
 }
 
+export type CommandAvailabilityOptions = CommandPathOptions;
+
 function stripWrappingQuotes(value: string): string {
   return value.replace(/^"+|"+$/g, "");
 }

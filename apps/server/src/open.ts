@@ -13,7 +13,7 @@ import { dirname } from "node:path";
 
 import { EDITORS, OpenError, type EditorId } from "@t3tools/contracts";
 import { ServiceMap, Effect, Layer } from "effect";
-import { isCommandAvailable } from "./commandPath.ts";
+import { isCommandAvailable, type CommandAvailabilityOptions } from "./commandPath.ts";
 
 // ==============================
 // Definitions
