@@ -1,4 +1,4 @@
-import { ProjectId, ThreadId, type TurnId } from "@t3tools/contracts";
+import { EnvironmentId, ProjectId, ThreadId, type TurnId } from "@t3tools/contracts";
 import { describe, expect, it } from "vitest";
 import { resolveDraftThreadDefaults } from "./threadDraftDefaults";
 import { DEFAULT_INTERACTION_MODE, DEFAULT_RUNTIME_MODE, type Thread } from "../types";
@@ -6,6 +6,7 @@ import { DEFAULT_INTERACTION_MODE, DEFAULT_RUNTIME_MODE, type Thread } from "../
 function makeThread(overrides: Partial<Thread> = {}): Thread {
   return {
     id: ThreadId.makeUnsafe("thread-1"),
+    environmentId: EnvironmentId.makeUnsafe("environment-local"),
     codexThreadId: null,
     projectId: ProjectId.makeUnsafe("project-1"),
     title: "Thread",
@@ -17,6 +18,8 @@ function makeThread(overrides: Partial<Thread> = {}): Thread {
     proposedPlans: [],
     error: null,
     createdAt: "2026-03-01T00:00:00.000Z",
+    archivedAt: null,
+    updatedAt: "2026-03-01T00:00:00.000Z",
     latestTurn: null,
     branch: null,
     worktreePath: null,
@@ -71,12 +74,14 @@ describe("resolveDraftThreadDefaults", () => {
           id: ThreadId.makeUnsafe("thread-older"),
           modelSelection: { provider: "codex", model: "gpt-5.4" },
           createdAt: "2026-03-08T10:00:00.000Z",
+          updatedAt: "2026-03-08T10:00:00.000Z",
         }),
         makeThread({
           id: ThreadId.makeUnsafe("thread-newest"),
           projectId: ProjectId.makeUnsafe("project-2"),
           modelSelection: { provider: "claudeAgent", model: "claude-sonnet-4-6" },
           createdAt: "2026-03-09T10:00:00.000Z",
+          updatedAt: "2026-03-09T10:00:00.000Z",
         }),
       ],
       projectId: ProjectId.makeUnsafe("project-3"),
